@@ -1,0 +1,9 @@
+{
+    "name": "voicehire",
+    "version": "1.0.0",
+    "description": "VoiceHire AI Mock Interview Platform",
+    "scripts": {
+        "start": "node voicehire-backend/server.js",
+        "dev": "node voicehire-backend/server.js"
+    }
+}

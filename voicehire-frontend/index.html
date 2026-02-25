@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description"
+    content="VoiceHire — AI-powered mock interview platform. Practice interviews with real-time AI feedback and voice recognition.">
+  <title>VoiceHire — AI Mock Interview Platform</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+
+  <!-- ═══ Navbar (hidden until logged in) ═══ -->
+  <nav class="navbar" id="navbar" style="display:none;">
+    <div class="logo">Voice<span>Hire</span></div>
+    <div class="nav-links">
+      <button id="nav-dashboard" onclick="navigate('dashboard')">📊 Dashboard</button>
+      <button id="nav-new" onclick="navigate('setup')">🎙️ New Interview</button>
+    </div>
+    <div class="nav-user">
+      <div class="avatar" id="nav-avatar">U</div>
+      <span id="nav-name">User</span>
+      <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- ═══ Loading Overlay ═══ -->
+  <div class="loading-overlay hidden" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Loading...</div>
+  </div>
+
+  <!-- ═══ Toast ═══ -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ═══════════════════════════════════════════
+       SCREEN 1: AUTH (Login / Register)
+       ═══════════════════════════════════════════ -->
+  <div class="screen active" id="screen-auth">
+    <div class="auth-container">
+      <div class="auth-card">
+        <h1>VoiceHire</h1>
+        <p class="subtitle">AI-Powered Mock Interviews</p>
+
+        <div class="auth-toggle">
+          <button class="active" id="toggle-login" onclick="switchAuthTab('login')">Login</button>
+          <button id="toggle-register" onclick="switchAuthTab('register')">Register</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="form-login" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="login-email" placeholder="you@example.com" required>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="login-password" placeholder="Enter password" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" id="btn-login">
+            Sign In →
+          </button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="form-register" style="display:none;" onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="reg-name" placeholder="John Doe" required minlength="2">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="reg-email" placeholder="you@example.com" required>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="reg-password" placeholder="Minimum 6 characters" required minlength="6">
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" id="btn-register">
+            Create Account →
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SCREEN 2: DASHBOARD
+       ═══════════════════════════════════════════ -->
+  <div class="screen" id="screen-dashboard">
+    <div style="max-width:900px; margin:0 auto;">
+      <div class="dashboard-header">
+        <h1>Welcome back, <span id="dash-name">User</span></h1>
+        <p>Track your interview performance and keep improving</p>
+      </div>
+
+      <div class="stats-row" id="dash-stats">
+        <div class="glass-card stat-card">
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-label">Total Interviews</div>
+        </div>
+        <div class="glass-card stat-card">
+          <div class="stat-value" id="stat-completed">0</div>
+          <div class="stat-label">Completed</div>
+        </div>
+        <div class="glass-card stat-card">
+          <div class="stat-value" id="stat-avg-score">—</div>
+          <div class="stat-label">Avg Score</div>
+        </div>
+        <div class="glass-card stat-card">
+          <div class="stat-value" id="stat-best">—</div>
+          <div class="stat-label">Best Grade</div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div class="section-title">📋 Interview History</div>
+        <button class="btn btn-primary" onclick="navigate('setup')">+ New Interview</button>
+      </div>
+
+      <div class="interview-list" id="interview-list">
+        <div class="empty-state">
+          <div class="empty-icon">🎙️</div>
+          <p>No interviews yet. Start your first mock interview!</p>
+          <button class="btn btn-primary" onclick="navigate('setup')">Start Interview</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SCREEN 3: INTERVIEW SETUP
+       ═══════════════════════════════════════════ -->
+  <div class="screen" id="screen-setup">
+    <div class="setup-container">
+      <h2>Configure Your <span>Interview</span></h2>
+      <form class="glass-card" id="form-setup" onsubmit="handleStartInterview(event)" style="padding:32px;">
+        <div class="setup-grid">
+          <div class="form-group full">
+            <label>Job Role *</label>
+            <input type="text" id="setup-role" placeholder="e.g. Software Engineer, Product Manager" required>
+          </div>
+          <div class="form-group">
+            <label>Experience Level</label>
+            <select id="setup-experience">
+              <option value="">Select level</option>
+              <option>Fresher (0-1 yr)</option>
+              <option>Junior (1-3 yrs)</option>
+              <option>Mid-level (3-6 yrs)</option>
+              <option>Senior (6-10 yrs)</option>
+              <option>Lead / Staff (10+ yrs)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Interview Type *</label>
+            <select id="setup-type" required>
+              <option value="behavioral">Behavioral</option>
+              <option value="technical">Technical</option>
+              <option value="situational">Situational</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Difficulty *</label>
+            <select id="setup-difficulty" required>
+              <option value="Easy">Easy</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="Hard">Hard</option>
+              <option value="Expert">Expert</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Number of Questions *</label>
+            <select id="setup-num" required>
+              <option value="3">3 Questions</option>
+              <option value="5" selected>5 Questions</option>
+              <option value="7">7 Questions</option>
+              <option value="10">10 Questions</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label>Topic / Focus Area (optional)</label>
+            <input type="text" id="setup-topic" placeholder="e.g. React, System Design, Leadership">
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-top:24px;">
+          <button type="button" class="btn btn-secondary" onclick="navigate('dashboard')" style="flex:1;">←
+            Back</button>
+          <button type="submit" class="btn btn-primary" style="flex:2;" id="btn-start-interview">
+            🎙️ Start Interview
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SCREEN 4: INTERVIEW SESSION
+       ═══════════════════════════════════════════ -->
+  <div class="screen" id="screen-session">
+    <div class="session-container">
+
+      <!-- ═══ Camera Preview Panel (PiP) ═══ -->
+      <div class="camera-panel glass-card" id="camera-panel">
+        <video id="camera-video" autoplay playsinline muted></video>
+        <div class="camera-off-placeholder" id="camera-off-placeholder">
+          <div class="camera-off-icon">📷</div>
+          <div class="camera-off-text">Camera Off</div>
+        </div>
+        <canvas id="snapshot-canvas" style="display:none;"></canvas>
+        <div class="snapshot-flash" id="snapshot-flash"></div>
+        <div class="camera-panel-controls">
+          <button class="camera-pip-btn" id="btn-snapshot" onclick="takeSnapshot()" title="Take Snapshot">📸</button>
+        </div>
+      </div>
+
+      <div class="session-progress">
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="session-progress-bar" style="width:0%"></div>
+        </div>
+        <div class="progress-text" id="session-progress-text">Question 1 of 5</div>
+      </div>
+
+      <div class="question-card glass-card" id="question-card">
+        <div class="question-label" id="q-label">Question 1</div>
+        <div class="question-text" id="q-text">Loading question...</div>
+      </div>
+
+      <div class="voice-controls">
+        <button class="mic-btn" id="mic-btn" onclick="toggleVoice()" title="Click to speak">
+          🎤
+        </button>
+        <button class="mic-btn" id="speaker-btn" onclick="toggleSpeaker()" title="Speaker On (click to mute)"
+          style="border-color:var(--accent-cyan);">
+          🔈
+        </button>
+        <button class="mic-btn" id="camera-btn" onclick="toggleCamera()" title="Camera On (click to toggle)"
+          style="border-color:var(--accent-green);">
+          📹
+        </button>
+        <div class="voice-status" id="voice-status">Click the mic to speak your answer</div>
+      </div>
+
+      <div class="answer-area">
+        <textarea id="answer-text" placeholder="Type or speak your answer here..."></textarea>
+      </div>
+
+      <div id="feedback-area"></div>
+
+      <div class="session-actions">
+        <button class="btn btn-secondary" id="btn-skip" onclick="skipQuestion()">Skip →</button>
+        <button class="btn btn-primary" id="btn-submit-answer" onclick="submitAnswer()">
+          Submit Answer →
+        </button>
+        <button class="btn btn-primary" id="btn-next" onclick="nextQuestion()" style="display:none;">
+          Next Question →
+        </button>
+        <button class="btn btn-primary" id="btn-finish" onclick="finishInterview()" style="display:none;">
+          🏁 Finish & Get Report
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SCREEN 5: REPORT
+       ═══════════════════════════════════════════ -->
+  <div class="screen" id="screen-report">
+    <div class="report-container" id="report-content">
+      <!-- Dynamically rendered by JS -->
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
