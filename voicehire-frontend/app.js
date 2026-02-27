@@ -3,7 +3,7 @@
 //  API client, SPA router, auth, interview, report
 // ═══════════════════════════════════════════════
 
-const API = 'http://localhost:5000/api';
+const API = '/api';
 
 // ─── State ───
 let TOKEN = localStorage.getItem('voicehire_token') || '';
@@ -17,6 +17,14 @@ let speakerEnabled = true;
 let currentUtterance = null;
 let cameraEnabled = true;
 let cameraStream = null;
+
+// ─── Proctoring State ───
+let proctorWarnings = 0;
+const MAX_PROCTOR_WARNINGS = 3;
+let proctorActive = false;
+let faceDetectionInterval = null;
+let previousFrameData = null;
+let proctorCooldown = false; // prevents rapid-fire warnings
 
 // ─── Boot ───
 document.addEventListener('DOMContentLoaded', async () => {
@@ -91,9 +99,10 @@ function navigate(screen) {
     // Hooks
     if (screen === 'dashboard') loadDashboard();
 
-    // Stop camera when leaving session screen
+    // Stop camera and proctoring when leaving session screen
     if (screen !== 'session') {
         stopCamera();
+        stopProctoring();
     }
 }
 
@@ -377,12 +386,17 @@ function renderCurrentQuestion() {
     // Reset voice input
     stopVoice();
 
-    // � Start camera if enabled
+    // Start camera if enabled
     if (cameraEnabled && !cameraStream) {
         startCamera();
     }
 
-    // �🔊 Interviewer speaks the question aloud
+    // Start proctoring if not already active
+    if (!proctorActive) {
+        startProctoring();
+    }
+
+    // Interviewer speaks the question aloud
     speakText(`Question ${currentQIndex + 1}. ${q.text}`);
 }
 
@@ -509,7 +523,7 @@ function startVoice() {
     recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang = 'en-IN';
 
     let finalTranscript = document.getElementById('answer-text').value;
 
@@ -570,20 +584,20 @@ function speakText(text) {
     utterance.pitch = 0.85;
     utterance.volume = 1;
 
-    // Pick the best English voice available
+    // Pick the best Indian English voice available
     const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v =>
-        v.name.includes('Google UK English Male') ||
-        v.name.includes('Microsoft David') ||
-        v.name.includes('Google US English') ||
-        v.name.includes('Microsoft Mark') ||
-        v.name.includes('Daniel')
-    ) || voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('male'))
+    const preferred = voices.find(v => v.lang === 'en-IN')
+        || voices.find(v =>
+            v.name.includes('Google हिन्दी') ||
+            v.name.includes('Microsoft Heera') ||
+            v.name.includes('Microsoft Ravi')
+        )
+        || voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('india'))
         || voices.find(v => v.lang.startsWith('en'))
         || voices[0];
 
     if (preferred) utterance.voice = preferred;
-    utterance.lang = 'en-US';
+    utterance.lang = 'en-IN';
 
     currentUtterance = utterance;
 
@@ -712,6 +726,226 @@ function takeSnapshot() {
     link.click();
 
     toast('Snapshot saved! 📸', 'success');
+}
+
+// ═══════════════════════════════════════════════
+//  PROCTORING (Cheating Detection)
+// ═══════════════════════════════════════════════
+
+function startProctoring() {
+    if (proctorActive) return;
+    proctorActive = true;
+    proctorWarnings = 0;
+    previousFrameData = null;
+    proctorCooldown = false;
+
+    // Update status bar
+    updateProctorStatusBar();
+
+    // 1. Tab Switch Detection (Page Visibility API)
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // 2. Window blur detection (catches Alt+Tab, clicking outside browser)
+    window.addEventListener('blur', handleWindowBlur);
+
+    // 3. Face/Head Movement Detection via canvas frame comparison
+    startFaceDetection();
+
+    console.log('[Proctor] Proctoring started');
+}
+
+function stopProctoring() {
+    if (!proctorActive) return;
+    proctorActive = false;
+
+    // Remove listeners
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('blur', handleWindowBlur);
+
+    // Stop face detection
+    if (faceDetectionInterval) {
+        clearInterval(faceDetectionInterval);
+        faceDetectionInterval = null;
+    }
+    previousFrameData = null;
+
+    console.log('[Proctor] Proctoring stopped');
+}
+
+// --- Tab Visibility Change ---
+function handleVisibilityChange() {
+    if (!proctorActive) return;
+    if (document.hidden) {
+        handleProctorViolation('You switched away from the interview tab. Please stay focused on this page.');
+    }
+}
+
+// --- Window Blur (Alt+Tab, clicking outside) ---
+function handleWindowBlur() {
+    if (!proctorActive) return;
+    // Small delay to avoid false positives from UI interactions
+    setTimeout(() => {
+        if (!proctorActive) return;
+        if (document.hidden) {
+            // Already handled by visibilitychange
+            return;
+        }
+        handleProctorViolation('You navigated away from the browser window. Please keep this window focused.');
+    }, 300);
+}
+
+// --- Face/Head Movement Detection ---
+function startFaceDetection() {
+    if (faceDetectionInterval) clearInterval(faceDetectionInterval);
+
+    // Check every 2 seconds
+    faceDetectionInterval = setInterval(() => {
+        if (!proctorActive || !cameraStream) return;
+        detectFaceMovement();
+    }, 2000);
+}
+
+function detectFaceMovement() {
+    const video = document.getElementById('camera-video');
+    const canvas = document.getElementById('proctor-canvas');
+    if (!video || !canvas || !video.videoWidth) return;
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = 160;  // Low-res for performance
+    canvas.height = 120;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const currentData = currentFrame.data;
+
+    if (!previousFrameData) {
+        previousFrameData = currentData.slice();
+        return;
+    }
+
+    // Compare frames: count pixels with significant change
+    let changedPixels = 0;
+    const totalPixels = canvas.width * canvas.height;
+    const threshold = 60; // Per-channel difference threshold
+
+    for (let i = 0; i < currentData.length; i += 4) {
+        const rDiff = Math.abs(currentData[i] - previousFrameData[i]);
+        const gDiff = Math.abs(currentData[i + 1] - previousFrameData[i + 1]);
+        const bDiff = Math.abs(currentData[i + 2] - previousFrameData[i + 2]);
+        const avgDiff = (rDiff + gDiff + bDiff) / 3;
+
+        if (avgDiff > threshold) {
+            changedPixels++;
+        }
+    }
+
+    const changePercent = (changedPixels / totalPixels) * 100;
+    previousFrameData = currentData.slice();
+
+    // If more than 40% of the frame changed dramatically, likely head moved away
+    if (changePercent > 40) {
+        console.log(`[Proctor] Significant movement detected: ${changePercent.toFixed(1)}% pixels changed`);
+        handleProctorViolation('Excessive head movement detected. Please face the camera and stay focused on the interview.');
+    }
+}
+
+// --- Violation Handler ---
+function handleProctorViolation(reason) {
+    if (!proctorActive || proctorCooldown) return;
+
+    proctorWarnings++;
+    proctorCooldown = true;
+
+    // Cooldown: prevent multiple warnings within 8 seconds
+    setTimeout(() => { proctorCooldown = false; }, 8000);
+
+    updateProctorStatusBar();
+
+    console.log(`[Proctor] Violation #${proctorWarnings}: ${reason}`);
+
+    if (proctorWarnings >= MAX_PROCTOR_WARNINGS) {
+        // Terminate interview
+        showInterviewTerminated(reason);
+    } else {
+        showProctorWarning(reason, proctorWarnings);
+    }
+}
+
+// --- Update Status Bar ---
+function updateProctorStatusBar() {
+    const bar = document.getElementById('proctor-status-bar');
+    const countEl = document.getElementById('proctor-warning-count');
+    if (!bar || !countEl) return;
+
+    countEl.textContent = `Warnings: ${proctorWarnings} / ${MAX_PROCTOR_WARNINGS}`;
+
+    if (proctorWarnings > 0) {
+        bar.classList.add('has-warnings');
+    } else {
+        bar.classList.remove('has-warnings');
+    }
+}
+
+// --- Show Warning Modal ---
+function showProctorWarning(reason, count) {
+    const modal = document.getElementById('proctor-warning-modal');
+    const reasonEl = document.getElementById('proctor-warning-reason');
+    const counterEl = document.getElementById('proctor-warning-counter');
+
+    if (reasonEl) reasonEl.textContent = reason;
+    if (counterEl) counterEl.textContent = `Warning ${count} of ${MAX_PROCTOR_WARNINGS}`;
+
+    modal.classList.remove('hidden');
+
+    // Play a warning sound effect using TTS
+    speakText('Warning! Suspicious activity has been detected. Please stay focused on your interview.');
+
+    // Auto-dismiss after 8 seconds if not clicked
+    setTimeout(() => {
+        if (!modal.classList.contains('hidden')) {
+            dismissProctorWarning();
+        }
+    }, 8000);
+}
+
+function dismissProctorWarning() {
+    const modal = document.getElementById('proctor-warning-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// --- Show Terminated Modal ---
+function showInterviewTerminated(lastReason) {
+    stopProctoring();
+    stopVoice();
+    window.speechSynthesis.cancel();
+
+    const modal = document.getElementById('proctor-terminated-modal');
+    const detailEl = document.getElementById('proctor-terminated-detail');
+    if (detailEl) {
+        detailEl.textContent = `Last violation: ${lastReason}`;
+    }
+    modal.classList.remove('hidden');
+
+    // Speak termination message
+    speakText('Your interview has been terminated due to multiple proctoring violations.');
+}
+
+async function dismissTerminatedModal() {
+    const modal = document.getElementById('proctor-terminated-modal');
+    if (modal) modal.classList.add('hidden');
+
+    // Try to mark interview as completed
+    if (currentInterview) {
+        try {
+            await api(`/interview/${currentInterview.id}/complete`, { method: 'PATCH' });
+        } catch (e) {
+            console.error('Failed to mark terminated interview:', e);
+        }
+    }
+
+    stopCamera();
+    navigate('dashboard');
+    toast('Interview was terminated due to proctoring violations.', 'error');
 }
 
 // ═══════════════════════════════════════════════

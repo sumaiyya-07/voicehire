@@ -203,6 +203,13 @@
   <div class="screen" id="screen-session">
     <div class="session-container">
 
+      <!-- ═══ Proctoring Status Bar ═══ -->
+      <div class="proctor-status-bar" id="proctor-status-bar">
+        <span class="proctor-shield">🛡️</span>
+        <span class="proctor-label">Proctoring Active</span>
+        <span class="proctor-warnings" id="proctor-warning-count">Warnings: 0 / 3</span>
+      </div>
+
       <!-- ═══ Camera Preview Panel (PiP) ═══ -->
       <div class="camera-panel glass-card" id="camera-panel">
         <video id="camera-video" autoplay playsinline muted></video>
@@ -211,6 +218,7 @@
           <div class="camera-off-text">Camera Off</div>
         </div>
         <canvas id="snapshot-canvas" style="display:none;"></canvas>
+        <canvas id="proctor-canvas" style="display:none;"></canvas>
         <div class="snapshot-flash" id="snapshot-flash"></div>
         <div class="camera-panel-controls">
           <button class="camera-pip-btn" id="btn-snapshot" onclick="takeSnapshot()" title="Take Snapshot">📸</button>
@@ -261,6 +269,29 @@
         <button class="btn btn-primary" id="btn-finish" onclick="finishInterview()" style="display:none;">
           🏁 Finish & Get Report
         </button>
+      </div>
+    </div>
+
+    <!-- ═══ Proctoring Warning Modal ═══ -->
+    <div class="proctor-modal-overlay hidden" id="proctor-warning-modal">
+      <div class="proctor-warning-card">
+        <div class="proctor-warning-icon">⚠️</div>
+        <h2>Warning!</h2>
+        <p class="proctor-warning-reason" id="proctor-warning-reason">Suspicious activity detected.</p>
+        <div class="proctor-warning-counter" id="proctor-warning-counter">Warning 1 of 3</div>
+        <p class="proctor-warning-note">Further violations will result in automatic termination of your interview.</p>
+        <button class="btn btn-primary" onclick="dismissProctorWarning()">I Understand — Continue</button>
+      </div>
+    </div>
+
+    <!-- ═══ Proctoring Terminated Modal ═══ -->
+    <div class="proctor-modal-overlay hidden" id="proctor-terminated-modal">
+      <div class="proctor-terminated-card">
+        <div class="proctor-terminated-icon">🚫</div>
+        <h2>Interview Terminated</h2>
+        <p>Your interview has been automatically ended due to multiple proctoring violations.</p>
+        <p class="proctor-terminated-detail" id="proctor-terminated-detail">You exceeded the maximum number of warnings.</p>
+        <button class="btn btn-primary" onclick="dismissTerminatedModal()">Return to Dashboard</button>
       </div>
     </div>
   </div>

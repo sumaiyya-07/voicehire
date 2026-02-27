@@ -2,8 +2,12 @@
     "name": "voicehire",
     "version": "1.0.0",
     "description": "VoiceHire AI Mock Interview Platform",
+    "engines": {
+        "node": ">=18.0.0"
+    },
     "scripts": {
         "start": "node voicehire-backend/server.js",
-        "dev": "node voicehire-backend/server.js"
+        "dev": "node voicehire-backend/server.js",
+        "install:backend": "cd voicehire-backend && npm install"
     }
 }
