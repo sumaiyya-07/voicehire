@@ -40,18 +40,26 @@ if (process.env.NODE_ENV === 'development') {
 // ─────────────────────────────────────────
 //  Rate Limiting
 // ─────────────────────────────────────────
-// General: 100 requests / 15 min per IP
+// General: 200 requests / 15 min per IP
 app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { success: false, message: 'Too many requests. Please try again in 15 minutes.' }
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ success: false, message: 'Too many requests. Please try again in 15 minutes.' });
+  }
 }));
 
-// Auth: 10 requests / 15 min per IP (prevent brute force)
+// Auth: 30 requests / 15 min per IP (prevent brute force)
 app.use('/api/auth/', rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { success: false, message: 'Too many auth attempts. Please try again in 15 minutes.' }
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ success: false, message: 'Too many auth attempts. Please try again in 15 minutes.' });
+  }
 }));
 
 // ─────────────────────────────────────────
@@ -80,7 +88,20 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─────────────────────────────────────────
-//  404 Handler
+//  SPA Fallback — serve index.html for non-API routes
+// ─────────────────────────────────────────
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
+      success: false,
+      message: `Route ${req.method} ${req.originalUrl} not found`
+    });
+  }
+  res.sendFile(path.join(__dirname, '..', 'voicehire-frontend', 'index.html'));
+});
+
+// ─────────────────────────────────────────
+//  404 Handler (non-GET requests to unknown routes)
 // ─────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({

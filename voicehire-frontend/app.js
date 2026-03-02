@@ -64,11 +64,28 @@ async function api(path, opts = {}) {
     const headers = { 'Content-Type': 'application/json' };
     if (TOKEN) headers['Authorization'] = `Bearer ${TOKEN}`;
 
-    const res = await fetch(`${API}${path}`, {
-        ...opts,
-        headers: { ...headers, ...(opts.headers || {}) },
-        body: opts.body ? JSON.stringify(opts.body) : undefined,
-    });
+    let res;
+    try {
+        res = await fetch(`${API}${path}`, {
+            ...opts,
+            headers: { ...headers, ...(opts.headers || {}) },
+            body: opts.body ? JSON.stringify(opts.body) : undefined,
+        });
+    } catch (networkErr) {
+        throw new Error('Cannot connect to server. Make sure the backend is running on http://localhost:5000');
+    }
+
+    // Guard against non-JSON responses (e.g. HTML pages)
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        if (res.status === 429) {
+            throw new Error('Too many requests. Please wait a few minutes and try again.');
+        }
+        throw new Error(
+            `Server returned an unexpected response (${res.status}). ` +
+            'Make sure you are accessing the app through http://localhost:5000'
+        );
+    }
 
     const data = await res.json();
     if (!res.ok) {
@@ -748,10 +765,13 @@ function startProctoring() {
     // 2. Window blur detection (catches Alt+Tab, clicking outside browser)
     window.addEventListener('blur', handleWindowBlur);
 
-    // 3. Face/Head Movement Detection via canvas frame comparison
+    // 3. Focus-based detection (backup for browsers where visibilitychange is unreliable)
+    window.addEventListener('focus', handleWindowFocus);
+
+    // 4. Face/Head Movement Detection via canvas frame comparison
     startFaceDetection();
 
-    console.log('[Proctor] Proctoring started');
+    console.log('[Proctor] Proctoring started — tab switch & blur detection active');
 }
 
 function stopProctoring() {
@@ -761,6 +781,7 @@ function stopProctoring() {
     // Remove listeners
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('blur', handleWindowBlur);
+    window.removeEventListener('focus', handleWindowFocus);
 
     // Stop face detection
     if (faceDetectionInterval) {
@@ -768,30 +789,43 @@ function stopProctoring() {
         faceDetectionInterval = null;
     }
     previousFrameData = null;
+    proctorTabSwitchedAway = false;
 
     console.log('[Proctor] Proctoring stopped');
 }
+
+// Track whether the user has left the tab/window
+let proctorTabSwitchedAway = false;
 
 // --- Tab Visibility Change ---
 function handleVisibilityChange() {
     if (!proctorActive) return;
     if (document.hidden) {
+        proctorTabSwitchedAway = true;
+        console.log('[Proctor] Tab hidden — visibilitychange detected');
         handleProctorViolation('You switched away from the interview tab. Please stay focused on this page.');
+    } else {
+        proctorTabSwitchedAway = false;
     }
 }
 
-// --- Window Blur (Alt+Tab, clicking outside) ---
+// --- Window Blur (Alt+Tab, clicking outside, opening new tab) ---
 function handleWindowBlur() {
     if (!proctorActive) return;
-    // Small delay to avoid false positives from UI interactions
+    // Short delay to avoid false positives from clicking browser UI elements
     setTimeout(() => {
         if (!proctorActive) return;
-        if (document.hidden) {
-            // Already handled by visibilitychange
-            return;
-        }
+        // If visibilitychange already handled this switch, don't double-warn
+        if (proctorTabSwitchedAway) return;
+        console.log('[Proctor] Window blur detected');
         handleProctorViolation('You navigated away from the browser window. Please keep this window focused.');
-    }, 300);
+    }, 200);
+}
+
+// --- Window Focus (backup detection — fires when user returns) ---
+function handleWindowFocus() {
+    if (!proctorActive) return;
+    proctorTabSwitchedAway = false;
 }
 
 // --- Face/Head Movement Detection ---
