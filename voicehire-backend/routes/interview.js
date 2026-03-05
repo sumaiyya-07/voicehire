@@ -1,5 +1,5 @@
 // routes/interview.js
-// Handles all interview lifecycle endpoints (all protected by JWT)
+// All interview lifecycle endpoints (all protected by JWT)
 //
 // POST   /api/interview/start              → create interview + generate questions
 // POST   /api/interview/:id/answer         → submit answer + get AI feedback
@@ -9,10 +9,11 @@
 // DELETE /api/interview/:id               → delete an interview
 
 const express = require('express');
-const { getDB } = require('../db/database');
 const authMiddleware = require('../middleware/auth');
+const Interview = require('../models/Interview');
 const { callGemini, parseGeminiJSON } = require('../config/gemini');
 const { generateLocalQuestions, evaluateAnswerLocally } = require('../config/fallback');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -21,12 +22,10 @@ router.use(authMiddleware);
 
 // ─────────────────────────────────────────
 //  POST /api/interview/start
-//  Creates interview record + generates questions via Gemini
 // ─────────────────────────────────────────
 router.post('/start', async (req, res) => {
   const { jobRole, experience, interviewType, topic, difficulty, numQuestions } = req.body;
 
-  // Validate required fields
   if (!jobRole || !interviewType || !difficulty || !numQuestions) {
     return res.status(400).json({
       success: false,
@@ -34,22 +33,13 @@ router.post('/start', async (req, res) => {
     });
   }
 
-  const db = getDB();
-
   try {
-    // 1. Generate questions — try Gemini first, fallback to local
+    // 1. Generate questions — Gemini first, fallback to local
     let questions;
-
     try {
       const topicLine = topic ? `Focus specifically on: ${topic}.` : '';
       const expLine = experience ? `Candidate experience level: ${experience}.` : '';
-
-      const prompt = `You are Morgan Reid, a senior hiring manager. Generate exactly ${numQuestions} ${interviewType} interview questions for a ${difficulty}-level ${jobRole} candidate.
-${expLine}
-${topicLine}
-Make questions sound natural and conversational, as a real interviewer would speak them. Be specific and progressively challenging.
-Return ONLY a valid JSON array of strings. No explanation. No markdown.
-Example: ["Tell me about yourself.", "Describe a recent challenge you overcame."]`;
+      const prompt = `You are Morgan Reid, a senior hiring manager. Generate exactly ${numQuestions} ${interviewType} interview questions for a ${difficulty}-level ${jobRole} candidate.\n${expLine}\n${topicLine}\nMake questions sound natural and conversational, as a real interviewer would speak them. Be specific and progressively challenging.\nReturn ONLY a valid JSON array of strings. No explanation. No markdown.\nExample: ["Tell me about yourself.", "Describe a recent challenge you overcame."]`;
 
       const raw = await callGemini(prompt, 0.8);
       questions = parseGeminiJSON(raw);
@@ -61,51 +51,37 @@ Example: ["Tell me about yourself.", "Describe a recent challenge you overcame."
       questions = generateLocalQuestions({ jobRole, interviewType, difficulty, numQuestions, topic });
     }
 
-    // 2. Save interview to database
-    const interviewResult = db.prepare(`
-      INSERT INTO interviews (user_id, job_role, experience, interview_type, topic, difficulty, num_questions)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(req.user.id, jobRole, experience || null, interviewType, topic || null, difficulty, questions.length);
-
-    const interviewId = interviewResult.lastInsertRowid;
-
-    // 3. Save all questions
-    const insertQuestion = db.prepare(`
-      INSERT INTO questions (interview_id, question_index, question_text)
-      VALUES (?, ?, ?)
-    `);
-
-    const insertMany = db.transaction((qs) => {
-      qs.forEach((q, i) => insertQuestion.run(interviewId, i, q));
+    // 2. Save interview with embedded questions
+    const interview = await Interview.create({
+      user: req.user.id,
+      jobRole,
+      experience: experience || null,
+      interviewType,
+      topic: topic || null,
+      difficulty,
+      numQuestions: questions.length,
+      questions: questions.map((q, i) => ({ questionIndex: i, questionText: q }))
     });
-
-    insertMany(questions);
-
-    // 4. Fetch saved questions with IDs
-    const savedQuestions = db.prepare(`
-      SELECT id, question_index, question_text FROM questions
-      WHERE interview_id = ? ORDER BY question_index ASC
-    `).all(interviewId);
 
     res.status(201).json({
       success: true,
       message: 'Interview started successfully',
-      interviewId,
-      questions: savedQuestions
+      interviewId: interview._id,
+      questions: interview.questions.map(q => ({
+        id: q._id,
+        question_index: q.questionIndex,
+        question_text: q.questionText
+      }))
     });
 
   } catch (err) {
     console.error('Start interview error:', err);
-    res.status(500).json({
-      success: false,
-      message: err.message || 'Failed to start interview. Check your Gemini API key.'
-    });
+    res.status(500).json({ success: false, message: err.message || 'Failed to start interview.' });
   }
 });
 
 // ─────────────────────────────────────────
 //  POST /api/interview/:id/answer
-//  Saves an answer + evaluates it with Gemini
 // ─────────────────────────────────────────
 router.post('/:id/answer', async (req, res) => {
   const { questionId, answerText } = req.body;
@@ -115,34 +91,19 @@ router.post('/:id/answer', async (req, res) => {
     return res.status(400).json({ success: false, message: 'questionId and answerText (min 5 chars) are required.' });
   }
 
-  const db = getDB();
-
-  // Verify interview belongs to this user
-  const interview = db.prepare('SELECT * FROM interviews WHERE id = ? AND user_id = ?').get(interviewId, req.user.id);
-  if (!interview) {
-    return res.status(404).json({ success: false, message: 'Interview not found.' });
-  }
-
-  // Get the question
-  const question = db.prepare('SELECT * FROM questions WHERE id = ? AND interview_id = ?').get(questionId, interviewId);
-  if (!question) {
-    return res.status(404).json({ success: false, message: 'Question not found.' });
-  }
-
   try {
-    // Evaluate answer with Gemini
-    const prompt = `You are evaluating a candidate's answer in a ${interview.difficulty} ${interview.interview_type} interview for a ${interview.job_role} role.
+    const interview = await Interview.findOne({ _id: interviewId, user: req.user.id });
+    if (!interview) {
+      return res.status(404).json({ success: false, message: 'Interview not found.' });
+    }
 
-Question: "${question.question_text}"
-Candidate's answer: "${answerText}"
+    const question = interview.questions.id(questionId);
+    if (!question) {
+      return res.status(404).json({ success: false, message: 'Question not found.' });
+    }
 
-Return ONLY a valid JSON object. No markdown. No explanation:
-{
-  "score": <integer 0 to 100>,
-  "positive": "<one specific strength of this answer in 1-2 sentences>",
-  "improve": "<one specific actionable improvement in 1-2 sentences>",
-  "brief": "<one sentence overall verdict, spoken aloud to the candidate>"
-}`;
+    // Evaluate with Gemini
+    const prompt = `You are evaluating a candidate's answer in a ${interview.difficulty} ${interview.interviewType} interview for a ${interview.jobRole} role.\n\nQuestion: "${question.questionText}"\nCandidate's answer: "${answerText}"\n\nReturn ONLY a valid JSON object. No markdown. No explanation:\n{\n  "score": <integer 0 to 100>,\n  "positive": "<one specific strength of this answer in 1-2 sentences>",\n  "improve": "<one specific actionable improvement in 1-2 sentences>",\n  "brief": "<one sentence overall verdict, spoken aloud to the candidate>"\n}`;
 
     let feedback;
     try {
@@ -150,20 +111,23 @@ Return ONLY a valid JSON object. No markdown. No explanation:
       feedback = parseGeminiJSON(raw);
       console.log('✅ Answer evaluated via Gemini AI');
     } catch (e) {
-      // Smart local fallback evaluator
       console.log('⚠️ Gemini unavailable, using local evaluator');
-      feedback = evaluateAnswerLocally(question.question_text, answerText, interview.difficulty);
+      feedback = evaluateAnswerLocally(question.questionText, answerText, interview.difficulty);
     }
 
-    // Save answer to database
-    const result = db.prepare(`
-      INSERT INTO answers (interview_id, question_id, answer_text, score, positive, improve, brief)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(interviewId, questionId, answerText, feedback.score, feedback.positive, feedback.improve, feedback.brief);
+    // Save answer into the embedded question subdocument
+    question.answer = {
+      answerText,
+      score: feedback.score,
+      positive: feedback.positive,
+      improve: feedback.improve,
+      brief: feedback.brief
+    };
+    await interview.save();
 
     res.json({
       success: true,
-      answerId: result.lastInsertRowid,
+      answerId: question.answer._id,
       feedback
     });
 
@@ -175,95 +139,129 @@ Return ONLY a valid JSON object. No markdown. No explanation:
 
 // ─────────────────────────────────────────
 //  PATCH /api/interview/:id/complete
-//  Marks interview as completed
 // ─────────────────────────────────────────
-router.patch('/:id/complete', (req, res) => {
-  const db = getDB();
-  const interview = db.prepare('SELECT * FROM interviews WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+router.patch('/:id/complete', async (req, res) => {
+  try {
+    const interview = await Interview.findOne({ _id: req.params.id, user: req.user.id });
+    if (!interview) {
+      return res.status(404).json({ success: false, message: 'Interview not found.' });
+    }
 
-  if (!interview) {
-    return res.status(404).json({ success: false, message: 'Interview not found.' });
+    // Calculate average score from embedded answers
+    const scores = interview.questions
+      .map(q => q.answer?.score)
+      .filter(s => s !== null && s !== undefined);
+    const overallScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    const grade = scoreToGrade(overallScore);
+
+    interview.status = 'completed';
+    interview.overallScore = overallScore;
+    interview.grade = grade;
+    interview.completedAt = new Date();
+    await interview.save();
+
+    res.json({ success: true, message: 'Interview marked as completed.', overallScore, grade });
+  } catch (err) {
+    console.error('Complete interview error:', err);
+    res.status(500).json({ success: false, message: 'Failed to complete interview.' });
   }
-
-  // Calculate average score from answers
-  const avgRow = db.prepare(`
-    SELECT AVG(score) as avg_score FROM answers WHERE interview_id = ?
-  `).get(req.params.id);
-
-  const overallScore = Math.round(avgRow.avg_score || 0);
-  const grade = scoreToGrade(overallScore);
-
-  db.prepare(`
-    UPDATE interviews
-    SET status = 'completed', overall_score = ?, grade = ?, completed_at = datetime('now')
-    WHERE id = ?
-  `).run(overallScore, grade, req.params.id);
-
-  res.json({ success: true, message: 'Interview marked as completed.', overallScore, grade });
 });
 
 // ─────────────────────────────────────────
 //  GET /api/interview/history
-//  Returns all interviews for logged-in user
 // ─────────────────────────────────────────
-router.get('/history', (req, res) => {
-  const db = getDB();
+router.get('/history', async (req, res) => {
+  try {
+    const interviews = await Interview.find({ user: req.user.id })
+      .select('jobRole experience interviewType topic difficulty numQuestions overallScore grade status createdAt completedAt questions')
+      .sort({ createdAt: -1 })
+      .lean();
 
-  const interviews = db.prepare(`
-    SELECT
-      i.id, i.job_role, i.experience, i.interview_type, i.topic,
-      i.difficulty, i.num_questions, i.overall_score, i.grade,
-      i.status, i.started_at, i.completed_at,
-      COUNT(a.id) as answered_count
-    FROM interviews i
-    LEFT JOIN answers a ON a.interview_id = i.id
-    WHERE i.user_id = ?
-    GROUP BY i.id
-    ORDER BY i.started_at DESC
-  `).all(req.user.id);
+    const result = interviews.map(i => ({
+      id: i._id,
+      job_role: i.jobRole,
+      experience: i.experience,
+      interview_type: i.interviewType,
+      topic: i.topic,
+      difficulty: i.difficulty,
+      num_questions: i.numQuestions,
+      overall_score: i.overallScore,
+      grade: i.grade,
+      status: i.status,
+      started_at: i.createdAt,
+      completed_at: i.completedAt,
+      answered_count: i.questions.filter(q => q.answer).length
+    }));
 
-  res.json({ success: true, total: interviews.length, interviews });
+    res.json({ success: true, total: result.length, interviews: result });
+  } catch (err) {
+    console.error('History error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch history.' });
+  }
 });
 
 // ─────────────────────────────────────────
 //  GET /api/interview/:id
-//  Get single interview with all questions and answers
 // ─────────────────────────────────────────
-router.get('/:id', (req, res) => {
-  const db = getDB();
+router.get('/:id', async (req, res) => {
+  try {
+    const interview = await Interview.findOne({ _id: req.params.id, user: req.user.id }).lean();
+    if (!interview) {
+      return res.status(404).json({ success: false, message: 'Interview not found.' });
+    }
 
-  const interview = db.prepare('SELECT * FROM interviews WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
-  if (!interview) {
-    return res.status(404).json({ success: false, message: 'Interview not found.' });
+    const questions = interview.questions.map(q => ({
+      id: q._id,
+      question_index: q.questionIndex,
+      question_text: q.questionText,
+      answer_id: q.answer?._id || null,
+      answer_text: q.answer?.answerText || null,
+      score: q.answer?.score ?? null,
+      positive: q.answer?.positive || null,
+      improve: q.answer?.improve || null,
+      brief: q.answer?.brief || null,
+      answered_at: q.answer?.createdAt || null
+    }));
+
+    res.json({
+      success: true,
+      interview: {
+        id: interview._id,
+        job_role: interview.jobRole,
+        experience: interview.experience,
+        interview_type: interview.interviewType,
+        topic: interview.topic,
+        difficulty: interview.difficulty,
+        num_questions: interview.numQuestions,
+        overall_score: interview.overallScore,
+        grade: interview.grade,
+        status: interview.status,
+        started_at: interview.createdAt,
+        completed_at: interview.completedAt
+      },
+      questions,
+      report: interview.report || null
+    });
+  } catch (err) {
+    console.error('Get interview error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch interview.' });
   }
-
-  const questions = db.prepare(`
-    SELECT q.id, q.question_index, q.question_text,
-           a.id as answer_id, a.answer_text, a.score, a.positive, a.improve, a.brief, a.answered_at
-    FROM questions q
-    LEFT JOIN answers a ON a.question_id = q.id AND a.interview_id = q.interview_id
-    WHERE q.interview_id = ?
-    ORDER BY q.question_index ASC
-  `).all(req.params.id);
-
-  const report = db.prepare('SELECT * FROM reports WHERE interview_id = ?').get(req.params.id);
-
-  res.json({ success: true, interview, questions, report: report || null });
 });
 
 // ─────────────────────────────────────────
 //  DELETE /api/interview/:id
 // ─────────────────────────────────────────
-router.delete('/:id', (req, res) => {
-  const db = getDB();
-
-  const interview = db.prepare('SELECT id FROM interviews WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
-  if (!interview) {
-    return res.status(404).json({ success: false, message: 'Interview not found.' });
+router.delete('/:id', async (req, res) => {
+  try {
+    const interview = await Interview.findOneAndDelete({ _id: req.params.id, user: req.user.id });
+    if (!interview) {
+      return res.status(404).json({ success: false, message: 'Interview not found.' });
+    }
+    res.json({ success: true, message: 'Interview deleted successfully.' });
+  } catch (err) {
+    console.error('Delete interview error:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete interview.' });
   }
-
-  db.prepare('DELETE FROM interviews WHERE id = ?').run(req.params.id);
-  res.json({ success: true, message: 'Interview deleted successfully.' });
 });
 
 // ─────────────────────────────────────────

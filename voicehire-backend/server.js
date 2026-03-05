@@ -10,10 +10,9 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
 // ─────────────────────────────────────────
-//  Initialize DB on startup
+//  Database
 // ─────────────────────────────────────────
-const { getDB } = require('./db/database');
-getDB(); // creates voicehire.db and schema if not exists
+const { connectDB } = require('./db/database');
 
 // ─────────────────────────────────────────
 //  App
@@ -122,24 +121,29 @@ app.use((err, req, res, next) => {
 });
 
 // ─────────────────────────────────────────
-//  Start Server
+//  Start Server (after DB connects)
 // ─────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`
+async function startServer() {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log(`
   ╔══════════════════════════════════════╗
   ║   VoiceHire Backend                  ║
   ║   Running on http://localhost:${PORT}  ║
   ║   Environment: ${(process.env.NODE_ENV || 'development').padEnd(19)}║
   ╚══════════════════════════════════════╝
   `);
-  console.log('📡 API Endpoints:');
-  console.log('   POST   /api/auth/register');
-  console.log('   POST   /api/auth/login');
-  console.log('   GET    /api/auth/me');
-  console.log('   POST   /api/interview/start');
-  console.log('   POST   /api/interview/:id/answer');
-  console.log('   GET    /api/interview/history');
-  console.log('   POST   /api/report/generate/:interviewId');
-  console.log('   GET    /api/report/:interviewId');
-  console.log('   GET    /api/health\n');
-});
+    console.log('📡 API Endpoints:');
+    console.log('   POST   /api/auth/register');
+    console.log('   POST   /api/auth/login');
+    console.log('   GET    /api/auth/me');
+    console.log('   POST   /api/interview/start');
+    console.log('   POST   /api/interview/:id/answer');
+    console.log('   GET    /api/interview/history');
+    console.log('   POST   /api/report/generate/:interviewId');
+    console.log('   GET    /api/report/:interviewId');
+    console.log('   GET    /api/health\n');
+  });
+}
+
+startServer();

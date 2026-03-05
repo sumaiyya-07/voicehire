@@ -1,145 +1,112 @@
 // routes/report.js
 // Handles: POST /api/report/generate/:interviewId
 //           GET  /api/report/:interviewId
+//           GET  /api/report/all/me
 
 const express = require('express');
-const { getDB } = require('../db/database');
 const authMiddleware = require('../middleware/auth');
+const Interview = require('../models/Interview');
 const { callGemini, parseGeminiJSON } = require('../config/gemini');
 const { generateReportLocally } = require('../config/fallback');
 
 const router = express.Router();
-
 router.use(authMiddleware);
 
 // ─────────────────────────────────────────
 //  POST /api/report/generate/:interviewId
-//  Generates full performance report via Gemini and saves to DB
 // ─────────────────────────────────────────
 router.post('/generate/:interviewId', async (req, res) => {
-  const db = getDB();
   const { interviewId } = req.params;
 
-  // 1. Verify interview belongs to this user
-  const interview = db.prepare(`
-    SELECT * FROM interviews WHERE id = ? AND user_id = ?
-  `).get(interviewId, req.user.id);
-
-  if (!interview) {
-    return res.status(404).json({ success: false, message: 'Interview not found.' });
-  }
-
-  // 2. Get all questions + answers
-  const qas = db.prepare(`
-    SELECT q.question_text, a.answer_text, a.score
-    FROM questions q
-    LEFT JOIN answers a ON a.question_id = q.id AND a.interview_id = q.interview_id
-    WHERE q.interview_id = ?
-    ORDER BY q.question_index ASC
-  `).all(interviewId);
-
-  const answeredQAs = qas.filter(qa => qa.answer_text);
-
-  if (answeredQAs.length === 0) {
-    return res.status(400).json({ success: false, message: 'No answers found for this interview.' });
-  }
-
-  // 3. Build Gemini prompt
-  const qaText = answeredQAs.map((qa, i) =>
-    `Q${i + 1}: ${qa.question_text}\nAnswer: ${qa.answer_text}`
-  ).join('\n\n');
-
-  const prompt = `You are a professional interview coach evaluating a complete ${interview.difficulty} ${interview.interview_type} interview for a ${interview.job_role} candidate.
-
-Here are all the questions and candidate answers:
-
-${qaText}
-
-Analyze the entire interview holistically and return ONLY a valid JSON object. No markdown, no explanation:
-{
-  "overallScore": <integer 0-100>,
-  "grade": "<Excellent|Good|Average|Needs Improvement|Poor>",
-  "communication": <integer 0-100>,
-  "relevance": <integer 0-100>,
-  "confidence": <integer 0-100>,
-  "structure": <integer 0-100>,
-  "depth": <integer 0-100>,
-  "strengths": ["<specific strength 1>", "<specific strength 2>", "<specific strength 3>"],
-  "improvements": ["<actionable improvement 1>", "<actionable improvement 2>", "<actionable improvement 3>"],
-  "recommendation": "<2-3 sentence strategic recommendation for this candidate's career development>"
-}`;
-
   try {
-    let analysis;
+    const interview = await Interview.findOne({ _id: interviewId, user: req.user.id });
+    if (!interview) {
+      return res.status(404).json({ success: false, message: 'Interview not found.' });
+    }
 
+    // Get answered Q&As
+    const answeredQAs = interview.questions
+      .filter(q => q.answer?.answerText)
+      .map(q => ({
+        question_text: q.questionText,
+        answer_text: q.answer.answerText,
+        score: q.answer.score
+      }));
+
+    if (answeredQAs.length === 0) {
+      return res.status(400).json({ success: false, message: 'No answers found for this interview.' });
+    }
+
+    // Build Gemini prompt
+    const qaText = answeredQAs.map((qa, i) =>
+      `Q${i + 1}: ${qa.question_text}\nAnswer: ${qa.answer_text}`
+    ).join('\n\n');
+
+    const prompt = `You are a professional interview coach evaluating a complete ${interview.difficulty} ${interview.interviewType} interview for a ${interview.jobRole} candidate.\n\nHere are all the questions and candidate answers:\n\n${qaText}\n\nAnalyze the entire interview holistically and return ONLY a valid JSON object. No markdown, no explanation:\n{\n  "overallScore": <integer 0-100>,\n  "grade": "<Excellent|Good|Average|Needs Improvement|Poor>",\n  "communication": <integer 0-100>,\n  "relevance": <integer 0-100>,\n  "confidence": <integer 0-100>,\n  "structure": <integer 0-100>,\n  "depth": <integer 0-100>,\n  "strengths": ["<specific strength 1>", "<specific strength 2>", "<specific strength 3>"],\n  "improvements": ["<actionable improvement 1>", "<actionable improvement 2>", "<actionable improvement 3>"],\n  "recommendation": "<2-3 sentence strategic recommendation for this candidate's career development>"\n}`;
+
+    let analysis;
     try {
       const raw = await callGemini(prompt, 0.4);
       analysis = parseGeminiJSON(raw);
       console.log('✅ Report generated via Gemini AI');
     } catch (e) {
       console.log('⚠️ Gemini unavailable, using local report generator');
-      analysis = generateReportLocally(interview, answeredQAs);
+      analysis = generateReportLocally(
+        {
+          job_role: interview.jobRole,
+          interview_type: interview.interviewType,
+          difficulty: interview.difficulty
+        },
+        answeredQAs
+      );
     }
 
-    // 4. Delete old report if exists (regeneration)
-    db.prepare('DELETE FROM reports WHERE interview_id = ?').run(interviewId);
+    // Save report as embedded subdocument + update interview
+    interview.report = {
+      overallScore: analysis.overallScore,
+      grade: analysis.grade,
+      communication: analysis.communication,
+      relevance: analysis.relevance,
+      confidence: analysis.confidence,
+      structure: analysis.structure,
+      depth: analysis.depth,
+      strengths: analysis.strengths,
+      improvements: analysis.improvements,
+      recommendation: analysis.recommendation
+    };
+    interview.overallScore = analysis.overallScore;
+    interview.grade = analysis.grade;
+    interview.status = 'completed';
+    if (!interview.completedAt) interview.completedAt = new Date();
+    await interview.save();
 
-    // 5. Save report to database
-    const result = db.prepare(`
-      INSERT INTO reports (
-        interview_id, overall_score, grade,
-        communication, relevance, confidence, structure, depth,
-        strengths, improvements, recommendation
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      interviewId,
-      analysis.overallScore,
-      analysis.grade,
-      analysis.communication,
-      analysis.relevance,
-      analysis.confidence,
-      analysis.structure,
-      analysis.depth,
-      JSON.stringify(analysis.strengths),
-      JSON.stringify(analysis.improvements),
-      analysis.recommendation
-    );
-
-    // 6. Update interview overall score
-    db.prepare(`
-      UPDATE interviews
-      SET overall_score = ?, grade = ?, status = 'completed', completed_at = COALESCE(completed_at, datetime('now'))
-      WHERE id = ?
-    `).run(analysis.overallScore, analysis.grade, interviewId);
-
-    // 7. Return full report + Q&A breakdown
-    const fullQAs = db.prepare(`
-      SELECT q.question_text, a.answer_text, a.score, a.positive, a.improve, a.brief
-      FROM questions q
-      LEFT JOIN answers a ON a.question_id = q.id AND a.interview_id = q.interview_id
-      WHERE q.interview_id = ?
-      ORDER BY q.question_index ASC
-    `).all(interviewId);
+    // Build full Q&A breakdown for response
+    const qaBreakdown = interview.questions.map(q => ({
+      question_text: q.questionText,
+      answer_text: q.answer?.answerText || null,
+      score: q.answer?.score ?? null,
+      positive: q.answer?.positive || null,
+      improve: q.answer?.improve || null,
+      brief: q.answer?.brief || null
+    }));
 
     res.json({
       success: true,
-      reportId: result.lastInsertRowid,
+      reportId: interview._id,
       report: {
         ...analysis,
-        strengths: analysis.strengths,
-        improvements: analysis.improvements,
-        generatedAt: new Date().toISOString()
+        generatedAt: interview.report.createdAt || new Date().toISOString()
       },
       interview: {
-        id: interview.id,
-        jobRole: interview.job_role,
+        id: interview._id,
+        jobRole: interview.jobRole,
         experience: interview.experience,
-        interviewType: interview.interview_type,
+        interviewType: interview.interviewType,
         difficulty: interview.difficulty,
         topic: interview.topic,
-        startedAt: interview.started_at
+        startedAt: interview.createdAt
       },
-      qaBreakdown: fullQAs
+      qaBreakdown
     });
 
   } catch (err) {
@@ -149,76 +116,83 @@ Analyze the entire interview holistically and return ONLY a valid JSON object. N
 });
 
 // ─────────────────────────────────────────
-//  GET /api/report/:interviewId
-//  Retrieves saved report for an interview
-// ─────────────────────────────────────────
-router.get('/:interviewId', (req, res) => {
-  const db = getDB();
-
-  const interview = db.prepare('SELECT * FROM interviews WHERE id = ? AND user_id = ?').get(req.params.interviewId, req.user.id);
-  if (!interview) {
-    return res.status(404).json({ success: false, message: 'Interview not found.' });
-  }
-
-  const report = db.prepare('SELECT * FROM reports WHERE interview_id = ?').get(req.params.interviewId);
-  if (!report) {
-    return res.status(404).json({ success: false, message: 'Report not found. Generate one first using POST /api/report/generate/:interviewId' });
-  }
-
-  const qaBreakdown = db.prepare(`
-    SELECT q.question_text, a.answer_text, a.score, a.positive, a.improve, a.brief
-    FROM questions q
-    LEFT JOIN answers a ON a.question_id = q.id AND a.interview_id = q.interview_id
-    WHERE q.interview_id = ?
-    ORDER BY q.question_index ASC
-  `).all(req.params.interviewId);
-
-  res.json({
-    success: true,
-    report: {
-      ...report,
-      strengths: JSON.parse(report.strengths || '[]'),
-      improvements: JSON.parse(report.improvements || '[]')
-    },
-    interview: {
-      id: interview.id,
-      jobRole: interview.job_role,
-      experience: interview.experience,
-      interviewType: interview.interview_type,
-      difficulty: interview.difficulty,
-      topic: interview.topic,
-      startedAt: interview.started_at,
-      completedAt: interview.completed_at
-    },
-    qaBreakdown
-  });
-});
-
-// ─────────────────────────────────────────
 //  GET /api/report/all/me
-//  Get all reports for logged-in user
+//  Must be defined BEFORE /:interviewId
 // ─────────────────────────────────────────
-router.get('/all/me', (req, res) => {
-  const db = getDB();
+router.get('/all/me', async (req, res) => {
+  try {
+    const interviews = await Interview.find({
+      user: req.user.id,
+      report: { $ne: null }
+    })
+      .select('jobRole difficulty interviewType numQuestions report createdAt')
+      .sort({ 'report.createdAt': -1 })
+      .lean();
 
-  const reports = db.prepare(`
-    SELECT r.id, r.interview_id, r.overall_score, r.grade, r.generated_at,
-           i.job_role, i.difficulty, i.interview_type, i.num_questions
-    FROM reports r
-    JOIN interviews i ON i.id = r.interview_id
-    WHERE i.user_id = ?
-    ORDER BY r.generated_at DESC
-  `).all(req.user.id);
+    const reports = interviews.map(i => ({
+      id: i.report._id,
+      interview_id: i._id,
+      overall_score: i.report.overallScore,
+      grade: i.report.grade,
+      generated_at: i.report.createdAt,
+      job_role: i.jobRole,
+      difficulty: i.difficulty,
+      interview_type: i.interviewType,
+      num_questions: i.numQuestions
+    }));
 
-  res.json({ success: true, total: reports.length, reports });
+    res.json({ success: true, total: reports.length, reports });
+  } catch (err) {
+    console.error('All reports error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch reports.' });
+  }
 });
 
-function scoreToGrade(score) {
-  if (score >= 85) return 'Excellent';
-  if (score >= 70) return 'Good';
-  if (score >= 55) return 'Average';
-  if (score >= 40) return 'Needs Improvement';
-  return 'Poor';
-}
+// ─────────────────────────────────────────
+//  GET /api/report/:interviewId
+// ─────────────────────────────────────────
+router.get('/:interviewId', async (req, res) => {
+  try {
+    const interview = await Interview.findOne({ _id: req.params.interviewId, user: req.user.id }).lean();
+    if (!interview) {
+      return res.status(404).json({ success: false, message: 'Interview not found.' });
+    }
+    if (!interview.report) {
+      return res.status(404).json({ success: false, message: 'Report not found. Generate one first using POST /api/report/generate/:interviewId' });
+    }
+
+    const qaBreakdown = interview.questions.map(q => ({
+      question_text: q.questionText,
+      answer_text: q.answer?.answerText || null,
+      score: q.answer?.score ?? null,
+      positive: q.answer?.positive || null,
+      improve: q.answer?.improve || null,
+      brief: q.answer?.brief || null
+    }));
+
+    res.json({
+      success: true,
+      report: {
+        ...interview.report,
+        strengths: interview.report.strengths || [],
+        improvements: interview.report.improvements || []
+      },
+      interview: {
+        id: interview._id,
+        jobRole: interview.jobRole,
+        experience: interview.experience,
+        interviewType: interview.interviewType,
+        difficulty: interview.difficulty,
+        topic: interview.topic,
+        startedAt: interview.createdAt,
+        completedAt: interview.completedAt
+      },
+      qaBreakdown
+    });
+  } catch (err) {
+    console.error('Get report error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch report.' });
+  }
+});
 
 module.exports = router;

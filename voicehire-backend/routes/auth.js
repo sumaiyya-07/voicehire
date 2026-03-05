@@ -1,11 +1,12 @@
 // routes/auth.js
-// Handles: POST /api/auth/register, POST /api/auth/login, GET /api/auth/me
+// Handles: POST /api/auth/register, POST /api/auth/login,
+//          GET /api/auth/me, PUT /api/auth/update-profile
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const { getDB } = require('../db/database');
+const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -15,7 +16,7 @@ const router = express.Router();
 // ─────────────────────────────────────────
 function generateToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, name: user.name },
+    { id: user._id, email: user.email, name: user.name },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -38,11 +39,9 @@ router.post(
     }
 
     const { name, email, password, photo } = req.body;
-    const db = getDB();
 
     try {
-      // Check if email already exists
-      const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+      const existing = await User.findOne({ email });
       if (existing) {
         return res.status(409).json({
           success: false,
@@ -50,16 +49,8 @@ router.post(
         });
       }
 
-      // Hash password
       const hashedPassword = await bcrypt.hash(password, 12);
-
-      // Insert user
-      const result = db.prepare(`
-        INSERT INTO users (name, email, password, photo)
-        VALUES (?, ?, ?, ?)
-      `).run(name, email, hashedPassword, photo || null);
-
-      const newUser = db.prepare('SELECT id, name, email, photo, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
+      const newUser = await User.create({ name, email, password: hashedPassword, photo: photo || null });
 
       const token = generateToken(newUser);
 
@@ -68,11 +59,11 @@ router.post(
         message: 'Account created successfully!',
         token,
         user: {
-          id: newUser.id,
+          id: newUser._id,
           name: newUser.name,
           email: newUser.email,
           photo: newUser.photo,
-          created_at: newUser.created_at
+          created_at: newUser.createdAt
         }
       });
     } catch (err) {
@@ -98,10 +89,9 @@ router.post(
     }
 
     const { email, password } = req.body;
-    const db = getDB();
 
     try {
-      const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+      const user = await User.findOne({ email });
       if (!user) {
         return res.status(401).json({ success: false, message: 'Invalid email or password.' });
       }
@@ -118,11 +108,11 @@ router.post(
         message: 'Logged in successfully!',
         token,
         user: {
-          id: user.id,
+          id: user._id,
           name: user.name,
           email: user.email,
           photo: user.photo,
-          created_at: user.created_at
+          created_at: user.createdAt
         }
       });
     } catch (err) {
@@ -135,15 +125,26 @@ router.post(
 // ─────────────────────────────────────────
 //  GET /api/auth/me  (protected)
 // ─────────────────────────────────────────
-router.get('/me', authMiddleware, (req, res) => {
-  const db = getDB();
-  const user = db.prepare('SELECT id, name, email, photo, created_at FROM users WHERE id = ?').get(req.user.id);
-
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found.' });
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        photo: user.photo,
+        created_at: user.createdAt
+      }
+    });
+  } catch (err) {
+    console.error('Get me error:', err);
+    res.status(500).json({ success: false, message: 'Server error.' });
   }
-
-  res.json({ success: true, user });
 });
 
 // ─────────────────────────────────────────
@@ -151,15 +152,23 @@ router.get('/me', authMiddleware, (req, res) => {
 // ─────────────────────────────────────────
 router.put('/update-profile', authMiddleware, async (req, res) => {
   const { name, photo } = req.body;
-  const db = getDB();
 
   try {
-    db.prepare(`
-      UPDATE users SET name = ?, photo = ?, updated_at = datetime('now') WHERE id = ?
-    `).run(name || req.user.name, photo || null, req.user.id);
-
-    const updated = db.prepare('SELECT id, name, email, photo FROM users WHERE id = ?').get(req.user.id);
-    res.json({ success: true, message: 'Profile updated.', user: updated });
+    const updated = await User.findByIdAndUpdate(
+      req.user.id,
+      { name: name || req.user.name, photo: photo || null },
+      { new: true, select: '-password' }
+    );
+    res.json({
+      success: true,
+      message: 'Profile updated.',
+      user: {
+        id: updated._id,
+        name: updated.name,
+        email: updated.email,
+        photo: updated.photo
+      }
+    });
   } catch (err) {
     console.error('Update profile error:', err);
     res.status(500).json({ success: false, message: 'Failed to update profile.' });
