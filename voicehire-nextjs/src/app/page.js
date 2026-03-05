@@ -40,6 +40,7 @@ export default function VoiceHireApp() {
   const videoRef = useRef(null);
   const snapshotCanvasRef = useRef(null);
   const proctorCanvasRef = useRef(null);
+  const objectDetectCanvasRef = useRef(null);
   const flashRef = useRef(null);
   const [cameraActive, setCameraActive] = useState(false);
 
@@ -50,11 +51,27 @@ export default function VoiceHireApp() {
   const proctorCooldownRef = useRef(false);
   const previousFrameRef = useRef(null);
   const faceIntervalRef = useRef(null);
+  const faceDetectIntervalRef = useRef(null);
+  const faceDetectorRef = useRef(null);
+  const cocoModelRef = useRef(null);
+  const objectDetectIntervalRef = useRef(null);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [warningReason, setWarningReason] = useState('');
   const [showTerminatedModal, setShowTerminatedModal] = useState(false);
   const [terminatedReason, setTerminatedReason] = useState('');
   const proctorWarningsRef = useRef(0);
+
+  // Behavior Analysis
+  const behaviorDataRef = useRef({
+    fillerCounts: {},
+    totalFillers: 0,
+    highMovementEvents: 0,
+    moderateMovementEvents: 0,
+    proctorViolations: 0,
+    sessionStartTime: null,
+  });
+  const [behaviorAnalysis, setBehaviorAnalysis] = useState(null);
+  const lastSpeechTextRef = useRef('');
 
   // ─── Boot ───
   useEffect(() => {
@@ -324,11 +341,24 @@ export default function VoiceHireApp() {
     rec.interimResults = true;
     rec.lang = 'en-IN';
     let finalT = answerText;
+    const FILLER_WORDS = ['umm', 'um', 'uh', 'hmm', 'hm', 'like', 'you know', 'basically', 'actually'];
     rec.onresult = (event) => {
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          finalT += event.results[i][0].transcript + ' ';
+          const segment = event.results[i][0].transcript;
+          finalT += segment + ' ';
+          // Detect filler words in this new final segment
+          const lower = segment.toLowerCase();
+          FILLER_WORDS.forEach((filler) => {
+            const regex = new RegExp(`\\b${filler.replace(' ', '\\s+')}\\b`, 'gi');
+            const matches = lower.match(regex);
+            if (matches) {
+              const bd = behaviorDataRef.current;
+              bd.fillerCounts[filler] = (bd.fillerCounts[filler] || 0) + matches.length;
+              bd.totalFillers += matches.length;
+            }
+          });
         } else {
           interim += event.results[i][0].transcript;
         }
@@ -458,6 +488,16 @@ export default function VoiceHireApp() {
     setProctorWarnings(0);
     previousFrameRef.current = null;
     proctorCooldownRef.current = false;
+    // Reset behavior tracking
+    behaviorDataRef.current = {
+      fillerCounts: {},
+      totalFillers: 0,
+      highMovementEvents: 0,
+      moderateMovementEvents: 0,
+      proctorViolations: 0,
+      sessionStartTime: Date.now(),
+    };
+    lastSpeechTextRef.current = '';
 
     const visHandler = () => {
       if (!proctorActiveRef.current) return;
@@ -473,7 +513,7 @@ export default function VoiceHireApp() {
     document.addEventListener('visibilitychange', visHandler);
     window.addEventListener('blur', blurHandler);
 
-    // Face detection interval
+    // Motion detection interval (pixel diff)
     faceIntervalRef.current = setInterval(() => {
       if (!proctorActiveRef.current || !cameraStreamRef.current) return;
       const video = videoRef.current;
@@ -495,15 +535,93 @@ export default function VoiceHireApp() {
         if (avg > 60) changed++;
       }
       previousFrameRef.current = cur.slice();
-      if ((changed / total) * 100 > 40) {
+      const changePct = (changed / total) * 100;
+      if (changePct > 40) {
         handleProctorViolation('Excessive head movement detected.');
+        behaviorDataRef.current.highMovementEvents += 1;
+        behaviorDataRef.current.proctorViolations += 1;
+      } else if (changePct > 18) {
+        behaviorDataRef.current.moderateMovementEvents += 1;
       }
     }, 2000);
+
+    // Multi-person object detection via COCO-SSD (draws red boxes, terminates on >1 person)
+    (async () => {
+      try {
+        if (!cocoModelRef.current) {
+          const cocoSsd = await import('@tensorflow-models/coco-ssd');
+          await import('@tensorflow/tfjs');
+          cocoModelRef.current = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
+        }
+        objectDetectIntervalRef.current = setInterval(async () => {
+          if (!proctorActiveRef.current || !cameraStreamRef.current) return;
+          const video = videoRef.current;
+          const canvas = objectDetectCanvasRef.current;
+          if (!video || !canvas || !video.videoWidth || video.readyState < 2) return;
+
+          // Match overlay canvas to video dimensions
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const displayW = video.clientWidth || vw;
+          const displayH = video.clientHeight || vh;
+          canvas.width = displayW;
+          canvas.height = displayH;
+
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, displayW, displayH);
+
+          let predictions;
+          try {
+            predictions = await cocoModelRef.current.detect(video);
+          } catch { return; }
+
+          // Filter only "person" class
+          const persons = predictions.filter((p) => p.class === 'person');
+          const scaleX = displayW / vw;
+          const scaleY = displayH / vh;
+
+          // Draw red bounding boxes for each detected person
+          persons.forEach((p) => {
+            const [x, y, w, h] = p.bbox;
+            const sx = x * scaleX;
+            const sy = y * scaleY;
+            const sw = w * scaleX;
+            const sh = h * scaleY;
+
+            // Box
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(sx, sy, sw, sh);
+
+            // Label background
+            const label = `Person (${Math.round(p.score * 100)}%)`;
+            ctx.font = 'bold 11px Inter, sans-serif';
+            const textW = ctx.measureText(label).width;
+            ctx.fillStyle = 'rgba(239,68,68,0.85)';
+            ctx.fillRect(sx, sy - 20, textW + 10, 20);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(label, sx + 5, sy - 5);
+          });
+
+          // Terminate immediately if >1 person detected
+          if (persons.length > 1 && proctorActiveRef.current) {
+            proctorActiveRef.current = false;
+            setTerminatedReason(
+              `Multiple people detected in camera (${persons.length} people). Only the candidate is allowed.`
+            );
+            setShowTerminatedModal(true);
+            speakText('Your interview has been terminated. Multiple people were detected in the camera.');
+          }
+        }, 2000);
+      } catch (err) {
+        console.warn('COCO-SSD object detection unavailable:', err.message);
+      }
+    })();
 
     // Store cleanup refs
     window._proctorVisHandler = visHandler;
     window._proctorBlurHandler = blurHandler;
-  }, [handleProctorViolation]);
+  }, [handleProctorViolation, speakText]);
 
   const stopProctoring = useCallback(() => {
     if (!proctorActiveRef.current) return;
@@ -511,6 +629,14 @@ export default function VoiceHireApp() {
     if (window._proctorVisHandler) document.removeEventListener('visibilitychange', window._proctorVisHandler);
     if (window._proctorBlurHandler) window.removeEventListener('blur', window._proctorBlurHandler);
     if (faceIntervalRef.current) { clearInterval(faceIntervalRef.current); faceIntervalRef.current = null; }
+    if (faceDetectIntervalRef.current) { clearInterval(faceDetectIntervalRef.current); faceDetectIntervalRef.current = null; }
+    if (objectDetectIntervalRef.current) { clearInterval(objectDetectIntervalRef.current); objectDetectIntervalRef.current = null; }
+    faceDetectorRef.current = null;
+    // Clear detection canvas
+    if (objectDetectCanvasRef.current) {
+      const ctx = objectDetectCanvasRef.current.getContext('2d');
+      ctx.clearRect(0, 0, objectDetectCanvasRef.current.width, objectDetectCanvasRef.current.height);
+    }
     previousFrameRef.current = null;
   }, []);
 
@@ -568,11 +694,97 @@ export default function VoiceHireApp() {
     setAnswerText('');
   };
 
+  const computeBehaviorAnalysis = () => {
+    const bd = behaviorDataRef.current;
+    const totalFillers = bd.totalFillers;
+    const movementEvents = bd.highMovementEvents + Math.floor(bd.moderateMovementEvents / 3);
+    const violations = bd.proctorViolations;
+
+    // Filler Score (0–10)
+    let fillerScore;
+    if (totalFillers <= 2) fillerScore = 10;
+    else if (totalFillers <= 6) fillerScore = 7;
+    else if (totalFillers <= 12) fillerScore = 4;
+    else fillerScore = 1;
+
+    // Professionalism (1–10)
+    const negativeEvents = movementEvents + violations * 2;
+    let professionalism;
+    if (negativeEvents === 0) professionalism = 10;
+    else if (negativeEvents <= 3) professionalism = 8;
+    else if (negativeEvents <= 6) professionalism = 6;
+    else if (negativeEvents <= 10) professionalism = 4;
+    else professionalism = 2;
+
+    // Confidence Rating
+    let confidenceRating;
+    if (fillerScore >= 7 && professionalism >= 7) confidenceRating = 'High';
+    else if (fillerScore >= 4 || professionalism >= 5) confidenceRating = 'Medium';
+    else confidenceRating = 'Low';
+
+    // Filler label
+    let fillerLabel;
+    if (totalFillers <= 2) fillerLabel = 'Excellent';
+    else if (totalFillers <= 6) fillerLabel = 'Good';
+    else if (totalFillers <= 12) fillerLabel = 'Moderate Nervousness';
+    else fillerLabel = 'High Nervousness';
+
+    // Detected Nervous Behaviors
+    const nervousBehaviors = [];
+    if (totalFillers > 2) nervousBehaviors.push(`Frequent filler words detected (${totalFillers} total)`);
+    if (bd.highMovementEvents > 0) nervousBehaviors.push(`Excessive body/head movement (${bd.highMovementEvents} instance${bd.highMovementEvents > 1 ? 's' : ''})`);
+    if (bd.moderateMovementEvents > 2) nervousBehaviors.push(`Repeated posture shifts during responses (${bd.moderateMovementEvents} occurrences)`);
+    if (violations > 0) nervousBehaviors.push(`Proctoring violations triggered (${violations})`);
+    if (nervousBehaviors.length === 0) nervousBehaviors.push('No significant nervous behaviors detected ✅');
+
+    // Posture Observations
+    const postureObs = [];
+    if (bd.highMovementEvents === 0 && bd.moderateMovementEvents <= 2) {
+      postureObs.push('Maintained a stable and upright posture throughout the session');
+      postureObs.push('Minimal unnecessary movement observed — strong attentiveness');
+    } else if (bd.highMovementEvents > 0) {
+      postureObs.push('Excessive head or body movement detected at times');
+      postureObs.push('Consider maintaining a steady, upright seated position');
+    } else {
+      postureObs.push('Some posture shifts noticed — likely due to nervousness');
+      postureObs.push('Try consciously relaxing shoulders and keeping gaze forward');
+    }
+    if (violations > 0) postureObs.push('Movement triggered proctoring alerts — review camera placement');
+
+    // Improvement Suggestions
+    const suggestions = [];
+    if (fillerScore < 7) suggestions.push('Practice pausing silently instead of using filler words like "umm" or "uh"');
+    if (professionalism < 7) suggestions.push('Work on maintaining a still, upright posture — try practicing in front of a mirror');
+    if (confidenceRating === 'Low' || confidenceRating === 'Medium') suggestions.push('Record yourself answering questions and review for body language cues');
+    suggestions.push('Take a slow breath before answering each question to center yourself');
+    if (violations > 0) suggestions.push('Ensure your face stays clearly visible on camera throughout the interview');
+    if (suggestions.length < 3) suggestions.push('Maintain consistent eye contact with the camera to project confidence');
+
+    // Top filler words
+    const topFillers = Object.entries(bd.fillerCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    return {
+      confidenceRating,
+      professionalism,
+      fillerScore,
+      fillerLabel,
+      totalFillers,
+      topFillers,
+      nervousBehaviors,
+      postureObs,
+      suggestions,
+    };
+  };
+
   const finishInterview = async () => {
     showLoading('Completing interview and generating your report...');
     try {
       await api(`/interview/${currentInterview.id}/complete`, { method: 'PATCH' });
       const data = await api(`/report/generate/${currentInterview.id}`, { method: 'POST' });
+      const behavior = computeBehaviorAnalysis();
+      setBehaviorAnalysis(behavior);
       setReportData(data);
       navigate('report');
       toast("Interview complete! Here's your performance report 🎯", 'success');
@@ -867,8 +1079,18 @@ export default function VoiceHireApp() {
               </div>
 
               {/* Camera Panel */}
-              <div className={`camera-panel glass-card !p-0 ${cameraActive ? 'camera-active' : ''}`}>
-                <video ref={videoRef} autoPlay playsInline muted />
+              <div className={`camera-panel glass-card !p-0 ${cameraActive ? 'camera-active' : ''}`} style={{ position: 'relative' }}>
+                <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit', display: 'block' }} />
+                {/* Object detection overlay canvas — red bounding boxes */}
+                <canvas
+                  ref={objectDetectCanvasRef}
+                  style={{
+                    position: 'absolute', top: 0, left: 0,
+                    width: '100%', height: '100%',
+                    pointerEvents: 'none', zIndex: 3,
+                    borderRadius: 'inherit',
+                  }}
+                />
                 {!cameraActive && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-[rgba(17,17,24,0.95)] rounded-2xl">
                     <div className="text-[2.5rem] opacity-40 mb-2">📷</div>
@@ -1085,6 +1307,92 @@ export default function VoiceHireApp() {
                   </div>
                 ))}
               </div>
+
+              {/* ─── Behavior Analysis Report ─── */}
+              {behaviorAnalysis && (() => {
+                const ba = behaviorAnalysis;
+                const confidenceColor = ba.confidenceRating === 'High' ? '#10b981' : ba.confidenceRating === 'Medium' ? '#f59e0b' : '#f43f5e';
+                const profColor = ba.professionalism >= 7 ? '#10b981' : ba.professionalism >= 5 ? '#f59e0b' : '#f43f5e';
+                const speechColor = ba.fillerScore >= 7 ? '#10b981' : ba.fillerScore >= 4 ? '#f59e0b' : '#f43f5e';
+                return (
+                  <div className="glass-card !p-6 mb-6" style={{ border: '1px solid rgba(124,58,237,0.25)', background: 'rgba(124,58,237,0.04)' }}>
+                    <div className="text-[1.15rem] font-bold flex items-center gap-2 mb-5">🧠 Interview Behavior Report</div>
+
+                    {/* Score Row */}
+                    <div className="grid grid-cols-3 gap-4 mb-6 max-md:grid-cols-1">
+                      <div className="text-center glass-card !p-4 !rounded-xl">
+                        <div className="text-[0.72rem] text-text-muted uppercase tracking-[1px] mb-2 font-semibold">Confidence Rating</div>
+                        <div className="text-[1.6rem] font-extrabold" style={{ color: confidenceColor }}>{ba.confidenceRating}</div>
+                      </div>
+                      <div className="text-center glass-card !p-4 !rounded-xl">
+                        <div className="text-[0.72rem] text-text-muted uppercase tracking-[1px] mb-2 font-semibold">Professionalism</div>
+                        <div className="text-[1.6rem] font-extrabold" style={{ color: profColor }}>{ba.professionalism}<span className="text-[1rem] font-normal text-text-muted">/10</span></div>
+                      </div>
+                      <div className="text-center glass-card !p-4 !rounded-xl">
+                        <div className="text-[0.72rem] text-text-muted uppercase tracking-[1px] mb-2 font-semibold">Speech Confidence</div>
+                        <div className="text-[1.6rem] font-extrabold" style={{ color: speechColor }}>{ba.fillerScore}<span className="text-[1rem] font-normal text-text-muted">/10</span></div>
+                      </div>
+                    </div>
+
+                    {/* Filler Word Analysis */}
+                    <div className="mb-5">
+                      <div className="text-[0.82rem] uppercase tracking-[0.5px] font-bold text-text-secondary mb-3 flex items-center gap-2">🗣️ Filler Word Analysis</div>
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-[0.85rem] text-text-muted">Total Fillers Detected:</span>
+                        <span className="font-bold text-[0.95rem]" style={{ color: speechColor }}>{ba.totalFillers}</span>
+                        <span className="text-[0.75rem] px-2 py-[2px] rounded-full font-semibold" style={{ background: `${speechColor}22`, color: speechColor }}>{ba.fillerLabel}</span>
+                      </div>
+                      {ba.topFillers.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {ba.topFillers.map(([word, count]) => (
+                            <span key={word} className="px-3 py-[5px] rounded-full text-[0.8rem] font-semibold" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                              &ldquo;{word}&rdquo; × {count}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[0.85rem] text-accent-green font-semibold">✅ No filler words detected — excellent speech clarity!</span>
+                      )}
+                    </div>
+
+                    {/* Detected Nervous Behaviors */}
+                    <div className="mb-5">
+                      <div className="text-[0.82rem] uppercase tracking-[0.5px] font-bold text-text-secondary mb-3">😰 Detected Nervous Behaviors</div>
+                      <ul className="list-none p-0 m-0">
+                        {ba.nervousBehaviors.map((b, i) => (
+                          <li key={i} className="flex items-start gap-2 py-[7px] border-b border-border-default text-text-secondary text-[0.88rem] last:border-b-0">
+                            <span className="w-[6px] h-[6px] rounded-full bg-accent-rose mt-[6px] shrink-0" style={{ background: b.includes('✅') ? '#10b981' : '#f43f5e' }} />{b}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Posture Observations */}
+                    <div className="mb-5">
+                      <div className="text-[0.82rem] uppercase tracking-[0.5px] font-bold text-text-secondary mb-3">🧍 Posture Observations</div>
+                      <ul className="list-none p-0 m-0">
+                        {ba.postureObs.map((obs, i) => (
+                          <li key={i} className="flex items-start gap-2 py-[7px] border-b border-border-default text-text-secondary text-[0.88rem] last:border-b-0">
+                            <span className="w-[6px] h-[6px] rounded-full bg-accent-cyan mt-[6px] shrink-0" />{obs}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Improvement Suggestions */}
+                    <div>
+                      <div className="text-[0.82rem] uppercase tracking-[0.5px] font-bold text-text-secondary mb-3">💡 Improvement Suggestions</div>
+                      <ul className="list-none p-0 m-0">
+                        {ba.suggestions.map((s, i) => (
+                          <li key={i} className="flex items-start gap-2 py-[7px] border-b border-border-default text-text-secondary text-[0.88rem] last:border-b-0">
+                            <span className="w-[6px] h-[6px] rounded-full bg-accent-violet mt-[6px] shrink-0" />{s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="flex gap-3 justify-center mt-6 pb-10">
                 <button className="btn btn-secondary" onClick={() => navigate('dashboard')}>← Back to Dashboard</button>
