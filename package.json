@@ -8,7 +8,7 @@
     "scripts": {
         "start": "node voicehire-backend/server.js",
         "dev": "node voicehire-backend/server.js",
-        "build": "cd voicehire-nextjs && npm run build",
+        "build": "cd voicehire-nextjs && npm install && npm run build",
         "install:backend": "cd voicehire-backend && npm install",
         "install:frontend": "cd voicehire-nextjs && npm install",
         "install:all": "cd voicehire-backend && npm install && cd ../voicehire-nextjs && npm install"
