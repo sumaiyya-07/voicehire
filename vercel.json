@@ -1,0 +1,7 @@
+{
+    "buildCommand": "cd voicehire-nextjs && npm install && npm run build",
+    "outputDirectory": "voicehire-nextjs/.next",
+    "devCommand": "cd voicehire-nextjs && npm run dev",
+    "framework": "nextjs",
+    "installCommand": "echo 'skip root install'"
+}
