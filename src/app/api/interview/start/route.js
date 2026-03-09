@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Interview from '@/models/Interview';
 import { verifyAuth } from '@/lib/auth';
-import { callGemini, parseGeminiJSON } from '@/lib/gemini';
+import { callGroq, parseGroqJSON } from '@/lib/groq';
 import { generateLocalQuestions } from '@/lib/fallback';
 
 export async function POST(request) {
@@ -20,13 +20,13 @@ export async function POST(request) {
             const topicLine = topic ? `Focus specifically on: ${topic}.` : '';
             const expLine = experience ? `Candidate experience level: ${experience}.` : '';
             const prompt = `You are Morgan Reid, a senior hiring manager. Generate exactly ${numQuestions} ${interviewType} interview questions for a ${difficulty}-level ${jobRole} candidate.\n${expLine}\n${topicLine}\nMake questions sound natural and conversational, as a real interviewer would speak them. Be specific and progressively challenging.\nReturn ONLY a valid JSON array of strings. No explanation. No markdown.\nExample: ["Tell me about yourself.", "Describe a recent challenge you overcame."]`;
-            const raw = await callGemini(prompt, 0.8);
-            questions = parseGeminiJSON(raw);
+            const raw = await callGroq(prompt, 0.8);
+            questions = parseGroqJSON(raw);
             if (!Array.isArray(questions)) throw new Error('Not an array');
             questions = questions.slice(0, numQuestions);
-            console.log('✅ Questions generated via Gemini AI');
-        } catch (geminiErr) {
-            console.log('⚠️ Gemini unavailable, using built-in questions:', geminiErr.message);
+            console.log('✅ Questions generated via Groq API');
+        } catch (groqErr) {
+            console.log('⚠️ Groq unavailable, using built-in questions:', groqErr.message);
             questions = generateLocalQuestions({ jobRole, interviewType, difficulty, numQuestions, topic });
         }
         const interview = await Interview.create({

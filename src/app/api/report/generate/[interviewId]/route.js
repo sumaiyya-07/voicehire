@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Interview from '@/models/Interview';
 import { verifyAuth } from '@/lib/auth';
-import { callGemini, parseGeminiJSON } from '@/lib/gemini';
+import { callGroq, parseGroqJSON } from '@/lib/groq';
 import { generateReportLocally } from '@/lib/fallback';
 
 export async function POST(request, { params }) {
@@ -20,8 +20,8 @@ export async function POST(request, { params }) {
         const prompt = `You are a professional interview coach evaluating a complete ${interview.difficulty} ${interview.interviewType} interview for a ${interview.jobRole} candidate.\n\nHere are all the questions and candidate answers:\n\n${qaText}\n\nAnalyze the entire interview holistically and return ONLY a valid JSON object. No markdown, no explanation:\n{\n  "overallScore": <integer 0-100>,\n  "grade": "<Excellent|Good|Average|Needs Improvement|Poor>",\n  "communication": <integer 0-100>,\n  "relevance": <integer 0-100>,\n  "confidence": <integer 0-100>,\n  "structure": <integer 0-100>,\n  "depth": <integer 0-100>,\n  "strengths": ["<specific strength 1>", "<specific strength 2>", "<specific strength 3>"],\n  "improvements": ["<actionable improvement 1>", "<actionable improvement 2>", "<actionable improvement 3>"],\n  "recommendation": "<2-3 sentence strategic recommendation for this candidate>"\n}`;
         let analysis;
         try {
-            const raw = await callGemini(prompt, 0.4);
-            analysis = parseGeminiJSON(raw);
+            const raw = await callGroq(prompt, 0.4);
+            analysis = parseGroqJSON(raw);
         } catch (e) {
             analysis = generateReportLocally({ job_role: interview.jobRole, interview_type: interview.interviewType, difficulty: interview.difficulty }, answeredQAs);
         }

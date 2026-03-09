@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Interview from '@/models/Interview';
 import { verifyAuth } from '@/lib/auth';
-import { callGemini, parseGeminiJSON } from '@/lib/gemini';
+import { callGroq, parseGroqJSON } from '@/lib/groq';
 import { evaluateAnswerLocally } from '@/lib/fallback';
 
 export async function POST(request, { params }) {
@@ -23,8 +23,8 @@ export async function POST(request, { params }) {
         const prompt = `You are evaluating a candidate's answer in a ${interview.difficulty} ${interview.interviewType} interview for a ${interview.jobRole} role.\n\nQuestion: "${question.questionText}"\nCandidate's answer: "${answerText}"\n\nReturn ONLY a valid JSON object. No markdown. No explanation:\n{\n  "score": <integer 0 to 100>,\n  "positive": "<one specific strength of this answer in 1-2 sentences>",\n  "improve": "<one specific actionable improvement in 1-2 sentences>",\n  "brief": "<one sentence overall verdict, spoken aloud to the candidate>"\n}`;
         let feedback;
         try {
-            const raw = await callGemini(prompt, 0.5);
-            feedback = parseGeminiJSON(raw);
+            const raw = await callGroq(prompt, 0.5);
+            feedback = parseGroqJSON(raw);
         } catch (e) {
             feedback = evaluateAnswerLocally(question.questionText, answerText, interview.difficulty);
         }
