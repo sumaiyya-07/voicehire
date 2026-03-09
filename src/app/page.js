@@ -840,34 +840,23 @@ export default function VoiceHireApp() {
     // ═══════════════════════════════════════════════
     return (
         <div className="app-wrapper">
+
             {/* ═══ Navbar ═══ */}
             {user && (
-                <nav className="flex items-center justify-between px-8 py-4 bg-[rgba(10,10,15,0.8)] backdrop-blur-[20px] border-b border-border-default sticky top-0 z-[100]">
-                    <div className="text-[1.4rem] font-extrabold gradient-text tracking-tight">
-                        Voice<span className="font-normal opacity-70">Hire</span>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                        <button
-                            onClick={() => navigate('dashboard')}
-                            className={`bg-transparent border border-border-default text-text-secondary px-4 py-2 rounded-lg text-[0.85rem] font-sans cursor-pointer transition-all duration-300 hover:bg-bg-card-hover hover:text-text-primary hover:border-accent-violet ${screen === 'dashboard' ? 'gradient-bg text-white !border-transparent' : ''}`}
-                        >
+                <nav className="navbar">
+                    <div className="navbar-logo">VoiceHire</div>
+                    <div className="navbar-nav">
+                        <button onClick={() => navigate('dashboard')} className={`nav-btn ${screen === 'dashboard' ? 'active' : ''}`}>
                             📊 Dashboard
                         </button>
-                        <button
-                            onClick={() => navigate('setup')}
-                            className={`bg-transparent border border-border-default text-text-secondary px-4 py-2 rounded-lg text-[0.85rem] font-sans cursor-pointer transition-all duration-300 hover:bg-bg-card-hover hover:text-text-primary hover:border-accent-violet ${screen === 'setup' ? 'gradient-bg text-white !border-transparent' : ''}`}
-                        >
+                        <button onClick={() => navigate('setup')} className={`nav-btn ${screen === 'setup' ? 'active' : ''}`}>
                             🎙️ New Interview
                         </button>
                     </div>
-                    <div className="flex items-center gap-[10px] text-text-secondary text-[0.85rem]">
-                        <div className="w-8 h-8 rounded-full gradient-bg flex items-center justify-center font-bold text-[0.8rem] text-white">
-                            {(user?.name || 'U').charAt(0).toUpperCase()}
-                        </div>
-                        <span>{user?.name || 'User'}</span>
-                        <button className="btn btn-secondary !py-[6px] !px-3 !text-[0.8rem]" onClick={doLogout}>
-                            Logout
-                        </button>
+                    <div className="navbar-user">
+                        <div className="user-avatar">{(user?.name || 'U').charAt(0).toUpperCase()}</div>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{user?.name || 'User'}</span>
+                        <button className="btn btn-ghost btn-sm" onClick={doLogout}>Sign out</button>
                     </div>
                 </nav>
             )}
@@ -876,7 +865,7 @@ export default function VoiceHireApp() {
             {loadingText && (
                 <div className="loading-overlay">
                     <div className="spinner" />
-                    <div className="text-text-secondary text-[0.9rem]">{loadingText}</div>
+                    <div className="loading-text">{loadingText}</div>
                 </div>
             )}
 
@@ -886,106 +875,191 @@ export default function VoiceHireApp() {
             </div>
 
             {/* ═══════════════════════════════════════════
-           SCREEN 1: AUTH
-           ═══════════════════════════════════════════ */}
+               SCREEN 1: AUTH
+               ═══════════════════════════════════════════ */}
             {screen === 'auth' && (
-                <div className="screen-container">
-                    <div className="screen-center">
-                        <div className="glass-card !rounded-3xl !p-10 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
-                            <h1 className="text-[1.75rem] font-bold text-center mb-1 gradient-text">VoiceHire</h1>
-                            <p className="text-center text-text-muted text-[0.9rem] mb-7">AI-Powered Mock Interviews</p>
-
-                            <div className="flex bg-bg-input rounded-lg p-1 mb-7">
-                                <button onClick={() => setAuthTab('login')} className={`flex-1 py-[10px] border-none rounded-md font-semibold text-[0.9rem] cursor-pointer transition-all duration-300 ${authTab === 'login' ? 'gradient-bg text-white shadow-[0_2px_12px_rgba(124,58,237,0.3)]' : 'bg-transparent text-text-muted'}`}>Login</button>
-                                <button onClick={() => setAuthTab('register')} className={`flex-1 py-[10px] border-none rounded-md font-semibold text-[0.9rem] cursor-pointer transition-all duration-300 ${authTab === 'register' ? 'gradient-bg text-white shadow-[0_2px_12px_rgba(124,58,237,0.3)]' : 'bg-transparent text-text-muted'}`}>Register</button>
+                <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'stretch' }}>
+                    {/* Left panel — brand */}
+                    <div style={{
+                        flex: '1', display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                        padding: '60px 56px', background: 'linear-gradient(160deg,rgba(139,92,246,0.15) 0%,rgba(34,211,238,0.06) 100%)',
+                        borderRight: '1px solid var(--color-border-subtle)',
+                        minWidth: '0',
+                    }} className="max-md:hidden">
+                        <div style={{ marginBottom: '48px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                <div style={{
+                                    width: '48px', height: '48px', borderRadius: '14px',
+                                    background: 'var(--gradient-brand)', display: 'flex', alignItems: 'center',
+                                    justifyContent: 'center', fontSize: '1.5rem', fontWeight: '900', color: '#fff',
+                                    boxShadow: '0 8px 24px rgba(139,92,246,0.4)',
+                                }}>V</div>
+                                <span style={{ fontSize: '1.8rem', fontWeight: '800', letterSpacing: '-0.5px', background: 'var(--gradient-brand)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>VoiceHire</span>
                             </div>
-
-                            {authTab === 'login' ? (
-                                <form onSubmit={handleLogin}>
-                                    <div className="mb-[18px]">
-                                        <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Email</label>
-                                        <input type="email" name="login-email" placeholder="you@example.com" required className="form-input" />
-                                    </div>
-                                    <div className="mb-[18px]">
-                                        <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Password</label>
-                                        <input type="password" name="login-password" placeholder="Enter password" required className="form-input" />
-                                    </div>
-                                    <button type="submit" className="btn btn-primary w-full">Sign In →</button>
-                                </form>
-                            ) : (
-                                <form onSubmit={handleRegister}>
-                                    <div className="mb-[18px]">
-                                        <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Full Name</label>
-                                        <input type="text" name="reg-name" placeholder="John Doe" required minLength={2} className="form-input" />
-                                    </div>
-                                    <div className="mb-[18px]">
-                                        <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Email</label>
-                                        <input type="email" name="reg-email" placeholder="you@example.com" required className="form-input" />
-                                    </div>
-                                    <div className="mb-[18px]">
-                                        <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Password</label>
-                                        <input type="password" name="reg-password" placeholder="Minimum 6 characters" required minLength={6} className="form-input" />
-                                    </div>
-                                    <button type="submit" className="btn btn-primary w-full">Create Account →</button>
-                                </form>
-                            )}
+                            <p style={{ fontSize: '1.1rem', color: 'var(--color-text-secondary)', lineHeight: '1.6', maxWidth: '360px' }}>
+                                The AI-powered mock interview platform that helps you land your dream job.
+                            </p>
                         </div>
+
+                        {[
+                            { icon: '🎙️', title: 'Voice-enabled answering', desc: 'Speak naturally — our AI listens and transcribes in real time' },
+                            { icon: '🧠', title: 'Instant AI feedback', desc: 'Get scored on communication, relevance, confidence & depth' },
+                            { icon: '🛡️', title: 'Proctored sessions', desc: 'Realistic exam conditions with smart monitoring' },
+                            { icon: '📊', title: 'Detailed performance reports', desc: 'Track improvement across sessions with visual breakdowns' },
+                        ].map((f, i) => (
+                            <div key={i} style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'flex-start' }}>
+                                <div style={{
+                                    width: '40px', height: '40px', borderRadius: '10px', flexShrink: '0',
+                                    background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem'
+                                }}>{f.icon}</div>
+                                <div>
+                                    <div style={{ fontWeight: '600', fontSize: '0.9rem', marginBottom: '3px' }}>{f.title}</div>
+                                    <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', lineHeight: '1.5' }}>{f.desc}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Right panel — form */}
+                    <div style={{
+                        width: '440px', flexShrink: '0', display: 'flex', flexDirection: 'column',
+                        justifyContent: 'center', padding: '60px 48px',
+                    }} className="max-md:w-full max-md:p-8">
+                        <div style={{ marginBottom: '32px' }}>
+                            <h1 style={{ fontSize: '1.6rem', fontWeight: '800', letterSpacing: '-0.3px', marginBottom: '6px' }}>
+                                {authTab === 'login' ? 'Welcome back' : 'Create your account'}
+                            </h1>
+                            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                                {authTab === 'login' ? 'Sign in to continue your interview prep' : 'Start your AI-powered interview practice today'}
+                            </p>
+                        </div>
+
+                        <div className="auth-tab-bar" style={{ marginBottom: '28px' }}>
+                            <button onClick={() => setAuthTab('login')} className={`auth-tab ${authTab === 'login' ? 'active' : ''}`}>Sign In</button>
+                            <button onClick={() => setAuthTab('register')} className={`auth-tab ${authTab === 'register' ? 'active' : ''}`}>Register</button>
+                        </div>
+
+                        {authTab === 'login' ? (
+                            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Email address</label>
+                                    <input type="email" name="login-email" placeholder="you@company.com" required className="form-input" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Password</label>
+                                    <input type="password" name="login-password" placeholder="Enter your password" required className="form-input" />
+                                </div>
+                                <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: '4px', width: '100%' }}>
+                                    Sign In →
+                                </button>
+                            </form>
+                        ) : (
+                            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Full name</label>
+                                    <input type="text" name="reg-name" placeholder="Jane Smith" required minLength={2} className="form-input" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Email address</label>
+                                    <input type="email" name="reg-email" placeholder="you@company.com" required className="form-input" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Password</label>
+                                    <input type="password" name="reg-password" placeholder="Minimum 6 characters" required minLength={6} className="form-input" />
+                                </div>
+                                <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: '4px', width: '100%' }}>
+                                    Create Account →
+                                </button>
+                            </form>
+                        )}
+
+                        <p style={{ marginTop: '24px', fontSize: '0.78rem', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                            By continuing, you agree to our Terms of Service and Privacy Policy.
+                        </p>
                     </div>
                 </div>
             )}
 
             {/* ═══════════════════════════════════════════
-           SCREEN 2: DASHBOARD
-           ═══════════════════════════════════════════ */}
+               SCREEN 2: DASHBOARD
+               ═══════════════════════════════════════════ */}
             {screen === 'dashboard' && (
                 <div className="screen-container">
                     <div className="screen-dashboard">
-                        <div className="text-center py-8 pb-6">
-                            <h1 className="text-[2rem] font-extrabold mb-1">Welcome back, <span className="gradient-text">{user?.name || 'User'}</span></h1>
-                            <p className="text-text-muted text-[0.95rem]">Track your interview performance and keep improving</p>
+                        {/* Hero header */}
+                        <div style={{ padding: '32px 0 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
+                            <div>
+                                <div style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '6px' }}>
+                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                                </div>
+                                <h1 style={{ fontSize: '1.9rem', fontWeight: '800', letterSpacing: '-0.5px', lineHeight: '1.15', marginBottom: '6px' }}>
+                                    Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'},{' '}
+                                    <span className="gradient-text">{user?.name?.split(' ')[0] || 'there'}</span> 👋
+                                </h1>
+                                <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                                    {interviews.length === 0 ? "Ready to start your interview preparation?" : `You've completed ${completed} of ${total} interview sessions.`}
+                                </p>
+                            </div>
+                            <button className="btn btn-primary" style={{ flexShrink: '0' }} onClick={() => navigate('setup')}>
+                                + New Interview
+                            </button>
                         </div>
 
-                        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4 mb-8">
+                        {/* Stats grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '32px' }} className="max-md:grid-cols-2">
                             {[
-                                { val: total, label: 'Total Interviews' },
-                                { val: completed, label: 'Completed' },
-                                { val: avg !== null ? avg : '—', label: 'Avg Score' },
-                                { val: bestGrade || '—', label: 'Best Grade' },
+                                { val: total, label: 'Total Sessions', icon: '📁', color: 'var(--color-accent-violet)' },
+                                { val: completed, label: 'Completed', icon: '✅', color: 'var(--color-accent-green)' },
+                                { val: avg !== null ? avg : '—', label: 'Avg Score', icon: '📈', color: 'var(--color-accent-cyan)' },
+                                { val: bestGrade || '—', label: 'Best Grade', icon: '🏆', color: 'var(--color-accent-amber)' },
                             ].map((s, i) => (
-                                <div key={i} className="glass-card text-center !p-5">
-                                    <div className="text-[2rem] font-extrabold gradient-text">{s.val}</div>
-                                    <div className="text-[0.8rem] text-text-muted uppercase tracking-[0.5px] mt-1">{s.label}</div>
+                                <div key={i} className="glass-card" style={{ padding: '20px', textAlign: 'center', borderTop: `2px solid ${s.color}22` }}>
+                                    <div style={{ fontSize: '1.4rem', marginBottom: '8px' }}>{s.icon}</div>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: '800', letterSpacing: '-0.04em', color: s.color, lineHeight: '1' }}>{s.val}</div>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginTop: '6px' }}>{s.label}</div>
                                 </div>
                             ))}
                         </div>
 
-                        <div className="flex justify-between items-center mb-4">
-                            <div className="text-[1.15rem] font-bold flex items-center gap-2">📋 Interview History</div>
-                            <button className="btn btn-primary" onClick={() => navigate('setup')}>+ New Interview</button>
+                        {/* History section */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                            <div>
+                                <div style={{ fontSize: '0.68rem', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '2px' }}>History</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '700' }}>Recent Sessions</div>
+                            </div>
                         </div>
 
-                        <div className="flex flex-col gap-3">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {interviews.length === 0 ? (
-                                <div className="text-center py-[60px] px-5 text-text-muted">
-                                    <div className="text-[3rem] mb-3 opacity-50">🎙️</div>
-                                    <p className="text-[0.95rem] mb-4">No interviews yet. Start your first mock interview!</p>
-                                    <button className="btn btn-primary" onClick={() => navigate('setup')}>Start Interview</button>
+                                <div className="glass-card" style={{ padding: '64px 24px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '3rem', marginBottom: '12px', opacity: '0.25' }}>🎙️</div>
+                                    <div style={{ fontWeight: '600', fontSize: '1rem', marginBottom: '6px' }}>No interviews yet</div>
+                                    <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: '20px' }}>Start your first mock interview to track your progress</div>
+                                    <button className="btn btn-primary" onClick={() => navigate('setup')}>Start your first interview →</button>
                                 </div>
                             ) : (
                                 interviews.map((iv) => (
-                                    <div key={iv.id || iv._id} className="glass-card flex items-center justify-between !py-[18px] !px-[22px] cursor-pointer max-md:flex-col max-md:items-start max-md:gap-3" onClick={() => viewInterview(iv.id || iv._id, iv.status)}>
-                                        <div className="flex-1">
-                                            <div className="font-semibold text-[1.05rem] mb-1">{iv.job_role}</div>
-                                            <div className="flex gap-3 text-[0.8rem] text-text-muted">
-                                                <span>{iv.interview_type}</span>
-                                                <span>{iv.num_questions} Q&apos;s</span>
+                                    <div key={iv.id || iv._id} className="interview-row" onClick={() => viewInterview(iv.id || iv._id, iv.status)}>
+                                        <div style={{ flex: '1', minWidth: '0' }}>
+                                            <div style={{ fontWeight: '600', fontSize: '0.975rem', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{iv.job_role}</div>
+                                            <div style={{ display: 'flex', gap: '10px', fontSize: '0.775rem', color: 'var(--color-text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                <span style={{ textTransform: 'capitalize' }}>{iv.interview_type}</span>
+                                                <span style={{ opacity: '0.4' }}>·</span>
+                                                <span>{iv.num_questions} questions</span>
+                                                <span style={{ opacity: '0.4' }}>·</span>
                                                 <span>{new Date(iv.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4 max-md:w-full max-md:justify-between">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: '0' }}>
                                             <span className={`badge badge-${iv.difficulty.toLowerCase()}`}>{iv.difficulty}</span>
-                                            <span className={`badge ${iv.status === 'completed' ? 'badge-completed' : 'badge-in-progress'}`}>{iv.status === 'completed' ? 'Completed' : 'In Progress'}</span>
-                                            {iv.overall_score && <div className={`score-circle ${getScoreClass(iv.overall_score)}`}>{iv.overall_score}</div>}
+                                            <span className={`badge ${iv.status === 'completed' ? 'badge-completed' : 'badge-in-progress'}`}>
+                                                {iv.status === 'completed' ? '✓ Done' : '⏳ In Progress'}
+                                            </span>
+                                            {iv.overall_score && (
+                                                <div className={`score-circle ${getScoreClass(iv.overall_score)}`}>{iv.overall_score}</div>
+                                            )}
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', opacity: '0.5' }}>›</span>
                                         </div>
                                     </div>
                                 ))
@@ -996,64 +1070,87 @@ export default function VoiceHireApp() {
             )}
 
             {/* ═══════════════════════════════════════════
-           SCREEN 3: INTERVIEW SETUP
-           ═══════════════════════════════════════════ */}
+               SCREEN 3: INTERVIEW SETUP
+               ═══════════════════════════════════════════ */}
             {screen === 'setup' && (
                 <div className="screen-container">
                     <div className="screen-setup">
-                        <h2 className="text-[1.5rem] font-bold mb-6 text-center">Configure Your <span className="gradient-text">Interview</span></h2>
-                        <form className="glass-card !p-8" onSubmit={handleStartInterview}>
-                            <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
-                                <div className="col-span-2 max-md:col-span-1">
-                                    <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Job Role *</label>
-                                    <input type="text" name="setup-role" placeholder="e.g. Software Engineer, Product Manager" required className="form-input" />
+                        <div style={{ textAlign: 'center', marginBottom: '32px', padding: '8px 0' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-accent-violet)', marginBottom: '8px' }}>Configure</div>
+                            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', letterSpacing: '-0.3px', marginBottom: '8px' }}>
+                                Set up your <span className="gradient-text">Interview</span>
+                            </h2>
+                            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Customize your session to match your target role and prep needs.</p>
+                        </div>
+
+                        <form className="glass-card" style={{ padding: '36px' }} onSubmit={handleStartInterview}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Job Role <span style={{ color: 'var(--color-accent-rose)' }}>*</span></label>
+                                    <input type="text" name="setup-role" placeholder="e.g. Software Engineer, Product Manager, Data Analyst" required className="form-input" style={{ fontSize: '0.95rem' }} />
                                 </div>
-                                <div>
-                                    <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Experience Level</label>
-                                    <select name="setup-experience" className="form-input">
-                                        <option value="">Select level</option>
-                                        <option>Fresher (0-1 yr)</option>
-                                        <option>Junior (1-3 yrs)</option>
-                                        <option>Mid-level (3-6 yrs)</option>
-                                        <option>Senior (6-10 yrs)</option>
-                                        <option>Lead / Staff (10+ yrs)</option>
-                                    </select>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }} className="max-sm:grid-cols-1">
+                                    <div className="form-group">
+                                        <label className="form-label">Experience Level</label>
+                                        <select name="setup-experience" className="form-input">
+                                            <option value="">Select level</option>
+                                            <option>Fresher (0–1 yr)</option>
+                                            <option>Junior (1–3 yrs)</option>
+                                            <option>Mid-level (3–6 yrs)</option>
+                                            <option>Senior (6–10 yrs)</option>
+                                            <option>Lead / Staff (10+ yrs)</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Interview Type <span style={{ color: 'var(--color-accent-rose)' }}>*</span></label>
+                                        <select name="setup-type" required className="form-input">
+                                            <option value="behavioral">🧠 Behavioral</option>
+                                            <option value="technical">💻 Technical</option>
+                                            <option value="situational">🎯 Situational</option>
+                                            <option value="mixed">🔀 Mixed</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Difficulty <span style={{ color: 'var(--color-accent-rose)' }}>*</span></label>
+                                        <select name="setup-difficulty" required className="form-input" defaultValue="Medium">
+                                            <option value="Easy">🟢 Easy</option>
+                                            <option value="Medium">🟡 Medium</option>
+                                            <option value="Hard">🟠 Hard</option>
+                                            <option value="Expert">🔴 Expert</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Questions <span style={{ color: 'var(--color-accent-rose)' }}>*</span></label>
+                                        <select name="setup-num" required className="form-input" defaultValue="5">
+                                            <option value="3">3 Questions (~10 min)</option>
+                                            <option value="5">5 Questions (~20 min)</option>
+                                            <option value="7">7 Questions (~30 min)</option>
+                                            <option value="10">10 Questions (~45 min)</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Interview Type *</label>
-                                    <select name="setup-type" required className="form-input">
-                                        <option value="behavioral">Behavioral</option>
-                                        <option value="technical">Technical</option>
-                                        <option value="situational">Situational</option>
-                                        <option value="mixed">Mixed</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Difficulty *</label>
-                                    <select name="setup-difficulty" required className="form-input" defaultValue="Medium">
-                                        <option value="Easy">Easy</option>
-                                        <option value="Medium">Medium</option>
-                                        <option value="Hard">Hard</option>
-                                        <option value="Expert">Expert</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Number of Questions *</label>
-                                    <select name="setup-num" required className="form-input" defaultValue="5">
-                                        <option value="3">3 Questions</option>
-                                        <option value="5">5 Questions</option>
-                                        <option value="7">7 Questions</option>
-                                        <option value="10">10 Questions</option>
-                                    </select>
-                                </div>
-                                <div className="col-span-2 max-md:col-span-1">
-                                    <label className="block text-[0.8rem] font-semibold text-text-secondary mb-[6px] uppercase tracking-[0.5px]">Topic / Focus Area (optional)</label>
-                                    <input type="text" name="setup-topic" placeholder="e.g. React, System Design, Leadership" className="form-input" />
+
+                                <div className="form-group">
+                                    <label className="form-label">Focus Topic <span style={{ color: 'var(--color-text-muted)', fontWeight: '400', textTransform: 'none', letterSpacing: '0' }}>— optional</span></label>
+                                    <input type="text" name="setup-topic" placeholder="e.g. React, System Design, Leadership, Communication" className="form-input" />
                                 </div>
                             </div>
-                            <div className="flex gap-3 mt-6">
-                                <button type="button" className="btn btn-secondary flex-1" onClick={() => navigate('dashboard')}>← Back</button>
-                                <button type="submit" className="btn btn-primary flex-[2]">🎙️ Start Interview</button>
+
+                            {/* Info strip */}
+                            <div style={{
+                                marginTop: '24px', padding: '14px 16px',
+                                background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)',
+                                borderRadius: '10px', fontSize: '0.8rem', color: 'var(--color-text-muted)',
+                                display: 'flex', alignItems: 'center', gap: '10px',
+                            }}>
+                                <span style={{ fontSize: '1rem' }}>💡</span>
+                                AI-generated questions are tailored to your role, level, and type. Camera and proctoring activate automatically.
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
+                                <button type="button" className="btn btn-secondary" style={{ flex: '1' }} onClick={() => navigate('dashboard')}>← Back</button>
+                                <button type="submit" className="btn btn-primary" style={{ flex: '2' }}>🎙️ Generate & Start Interview</button>
                             </div>
                         </form>
                     </div>
@@ -1061,143 +1158,195 @@ export default function VoiceHireApp() {
             )}
 
             {/* ═══════════════════════════════════════════
-           SCREEN 4: INTERVIEW SESSION
-           ═══════════════════════════════════════════ */}
+               SCREEN 4: INTERVIEW SESSION
+               ═══════════════════════════════════════════ */}
             {screen === 'session' && currentInterview && (() => {
                 const q = currentInterview.questions[currentQIndex];
                 const totalQ = currentInterview.questions.length;
                 const progress = (currentQIndex / totalQ) * 100;
                 const isLast = currentQIndex >= totalQ - 1;
                 return (
-                    <div className="screen-container">
-                        <div className="screen-session">
-                            {/* Proctoring Status Bar */}
-                            <div className={`proctor-status-bar ${proctorWarnings > 0 ? 'has-warnings' : ''}`}>
-                                <span className="text-[1.1rem]">🛡️</span>
-                                <span className={`uppercase tracking-[1px] text-[0.72rem] ${proctorWarnings > 0 ? 'text-accent-amber' : 'text-accent-green'}`}>Proctoring Active</span>
-                                <span className={`ml-auto font-medium ${proctorWarnings > 0 ? 'text-accent-amber font-bold' : 'text-text-muted'}`}>Warnings: {proctorWarnings} / {MAX_PROCTOR_WARNINGS}</span>
-                            </div>
+                    <div className="screen-container" style={{ paddingTop: '20px' }}>
+                        <div style={{ maxWidth: '860px', margin: '0 auto' }}>
 
-                            {/* Camera Panel */}
-                            <div className={`camera-panel glass-card !p-0 ${cameraActive ? 'camera-active' : ''}`} style={{ position: 'relative' }}>
-                                <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit', display: 'block' }} />
-                                {/* Object detection overlay canvas — red bounding boxes */}
-                                <canvas
-                                    ref={objectDetectCanvasRef}
-                                    style={{
-                                        position: 'absolute', top: 0, left: 0,
-                                        width: '100%', height: '100%',
-                                        pointerEvents: 'none', zIndex: 3,
-                                        borderRadius: 'inherit',
-                                    }}
-                                />
-                                {!cameraActive && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[rgba(17,17,24,0.95)] rounded-2xl">
-                                        <div className="text-[2.5rem] opacity-40 mb-2">📷</div>
-                                        <div className="text-[0.8rem] text-text-muted uppercase tracking-[1px] font-semibold">Camera Off</div>
-                                    </div>
-                                )}
-                                <canvas ref={snapshotCanvasRef} className="hidden" />
-                                <canvas ref={proctorCanvasRef} className="hidden" />
-                                <div ref={flashRef} className="snapshot-flash" />
-                                <div className="absolute bottom-[10px] right-[10px] flex gap-2 z-[4]">
-                                    <button onClick={takeSnapshot} title="Take Snapshot" className="w-9 h-9 rounded-full border border-white/20 bg-black/50 backdrop-blur-lg text-white text-base cursor-pointer transition-all duration-300 flex items-center justify-center hover:bg-black/70 hover:border-white/40 hover:scale-110">📸</button>
+                            {/* Top bar — proctor + progress */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                                <div className={`proctor-status-bar ${proctorWarnings > 0 ? 'has-warnings' : ''}`} style={{ flex: '1', margin: '0' }}>
+                                    <span>🛡️</span>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: proctorWarnings > 0 ? 'var(--color-accent-amber)' : 'var(--color-accent-green)' }}>
+                                        Proctoring Active
+                                    </span>
+                                    <span style={{ marginLeft: 'auto', fontSize: '0.8rem', fontWeight: '600', color: proctorWarnings > 0 ? 'var(--color-accent-amber)' : 'var(--color-text-muted)' }}>
+                                        {proctorWarnings}/{MAX_PROCTOR_WARNINGS} warnings
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                                    Q {currentQIndex + 1}/{totalQ}
                                 </div>
                             </div>
 
-                            {/* Progress */}
-                            <div className="mb-6">
-                                <div className="w-full h-[6px] bg-bg-input rounded-[3px] overflow-hidden mb-2">
-                                    <div className="h-full gradient-bg rounded-[3px] transition-[width] duration-500" style={{ width: `${progress}%` }} />
+                            {/* Progress bar */}
+                            <div style={{ marginBottom: '24px' }}>
+                                <div className="progress-bar-track">
+                                    <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
                                 </div>
-                                <div className="text-[0.8rem] text-text-muted text-right">Question {currentQIndex + 1} of {totalQ}</div>
                             </div>
 
-                            {/* Question Card */}
-                            <div className="glass-card !p-8 mb-5">
-                                <div className="text-[0.75rem] text-accent-violet uppercase tracking-[1px] font-bold mb-[10px]">Question {currentQIndex + 1}</div>
-                                <div className="text-[1.2rem] font-semibold leading-[1.5]">{q?.text || 'Loading...'}</div>
-                            </div>
+                            {/* Two-column layout */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '20px', alignItems: 'start' }} className="max-md:grid-cols-1">
 
-                            {/* Voice Controls */}
-                            <div className="flex items-center gap-3 mb-4">
-                                <button className={`mic-btn ${isRecording ? 'recording' : ''}`} onClick={() => isRecording ? stopVoice() : startVoice()} title="Click to speak">🎤</button>
-                                <button className="mic-btn" onClick={toggleSpeaker} title={speakerEnabled ? 'Speaker On' : 'Speaker Off'} style={{ borderColor: 'var(--color-accent-cyan)' }}>{speakerEnabled ? '🔈' : '🔇'}</button>
-                                <button className={`mic-btn ${cameraActive ? 'camera-on' : ''}`} onClick={toggleCamera} title="Toggle Camera" style={{ borderColor: 'var(--color-accent-green)' }}>📹</button>
-                                <div className="text-[0.85rem] text-text-muted">{isRecording ? '🔴 Listening... Click mic to stop' : 'Click the mic to speak your answer'}</div>
-                            </div>
-
-                            {/* Answer Area */}
-                            <div className="mb-5">
-                                <textarea
-                                    value={answerText}
-                                    onChange={(e) => setAnswerText(e.target.value)}
-                                    placeholder="Type or speak your answer here..."
-                                    disabled={feedbackReceived}
-                                    className="w-full min-h-[140px] resize-y form-input !rounded-xl !p-4 leading-[1.6]"
-                                />
-                            </div>
-
-                            {/* Feedback */}
-                            {feedbackData && (
-                                <div className="glass-card feedback-card">
-                                    <div className="flex items-center justify-between mb-[14px]">
-                                        <div>
-                                            <div className="text-[0.8rem] text-text-muted uppercase tracking-[0.5px] font-semibold">Score</div>
-                                            <div className="text-[1.8rem] font-extrabold" style={{ color: getScoreColor(feedbackData.score) }}>{feedbackData.score}/100</div>
+                                {/* Left column — camera + controls */}
+                                <div>
+                                    {/* Camera */}
+                                    <div className={`camera-panel ${cameraActive ? 'camera-active' : ''}`} style={{ maxWidth: 'none', marginBottom: '12px', aspectRatio: '4/3' }}>
+                                        <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit', display: 'block' }} />
+                                        <canvas ref={objectDetectCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 3, borderRadius: 'inherit' }} />
+                                        {!cameraActive && (
+                                            <div style={{ position: 'absolute', inset: '0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,10,15,0.9)', borderRadius: 'inherit' }}>
+                                                <div style={{ fontSize: '2rem', opacity: '0.3', marginBottom: '6px' }}>📷</div>
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Camera Off</div>
+                                            </div>
+                                        )}
+                                        <canvas ref={snapshotCanvasRef} style={{ display: 'none' }} />
+                                        <canvas ref={proctorCanvasRef} style={{ display: 'none' }} />
+                                        <div ref={flashRef} className="snapshot-flash" />
+                                        <div style={{ position: 'absolute', bottom: '8px', right: '8px', zIndex: 4 }}>
+                                            <button onClick={takeSnapshot} title="Snapshot" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', color: '#fff', fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📸</button>
                                         </div>
                                     </div>
-                                    <div className="mb-3">
-                                        <strong className="text-[0.8rem] uppercase tracking-[0.5px] text-accent-green">✅ Strength</strong>
-                                        <p className="text-text-secondary text-[0.9rem] mt-1">{feedbackData.positive}</p>
-                                    </div>
-                                    <div className="mb-3">
-                                        <strong className="text-[0.8rem] uppercase tracking-[0.5px] text-accent-amber">💡 Improvement</strong>
-                                        <p className="text-text-secondary text-[0.9rem] mt-1">{feedbackData.improve}</p>
-                                    </div>
-                                    <div className="py-3 px-4 bg-[rgba(124,58,237,0.08)] rounded-lg text-text-primary italic text-[0.9rem] mt-2">&quot;{feedbackData.brief}&quot;</div>
-                                </div>
-                            )}
 
-                            {/* Session Actions */}
-                            <div className="flex gap-3 justify-end max-md:flex-col">
-                                {!feedbackReceived && (
-                                    <>
-                                        <button className="btn btn-secondary max-md:w-full" onClick={skipQuestion}>Skip →</button>
-                                        <button className="btn btn-primary max-md:w-full" onClick={submitAnswer}>Submit Answer →</button>
-                                    </>
-                                )}
-                                {feedbackReceived && !isLast && (
-                                    <button className="btn btn-primary max-md:w-full" onClick={nextQuestion}>Next Question →</button>
-                                )}
-                                {feedbackReceived && isLast && (
-                                    <button className="btn btn-primary max-md:w-full" onClick={finishInterview}>🏁 Finish & Get Report</button>
-                                )}
+                                    {/* Control buttons */}
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '12px' }}>
+                                        <button className={`mic-btn ${isRecording ? 'recording' : ''}`} onClick={() => isRecording ? stopVoice() : startVoice()} title="Microphone" style={{ width: '44px', height: '44px', fontSize: '1.1rem' }}>🎤</button>
+                                        <button className="mic-btn" onClick={toggleSpeaker} title="Speaker" style={{ width: '44px', height: '44px', fontSize: '1.1rem', borderColor: 'var(--color-accent-cyan)' }}>{speakerEnabled ? '🔈' : '🔇'}</button>
+                                        <button className={`mic-btn ${cameraActive ? 'camera-on' : ''}`} onClick={toggleCamera} title="Camera" style={{ width: '44px', height: '44px', fontSize: '1.1rem', borderColor: 'var(--color-accent-green)' }}>📹</button>
+                                    </div>
+
+                                    {/* Mic status */}
+                                    <div style={{ textAlign: 'center', fontSize: '0.75rem', color: isRecording ? 'var(--color-accent-rose)' : 'var(--color-text-muted)', fontWeight: '500' }}>
+                                        {isRecording ? '● Listening...' : 'Click mic to speak'}
+                                    </div>
+
+                                    {/* Question list navigation */}
+                                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        {currentInterview.questions.map((qq, i) => (
+                                            <div key={i} style={{
+                                                padding: '6px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '500',
+                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                                background: i === currentQIndex ? 'rgba(139,92,246,0.15)' : 'transparent',
+                                                color: i === currentQIndex ? 'var(--color-accent-violet)' : qq.answered ? 'var(--color-accent-green)' : 'var(--color-text-muted)',
+                                                border: i === currentQIndex ? '1px solid rgba(139,92,246,0.2)' : '1px solid transparent',
+                                            }}>
+                                                <span style={{
+                                                    width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '700', flexShrink: '0',
+                                                    background: qq.answered ? 'var(--color-accent-green-dim)' : i === currentQIndex ? 'var(--color-accent-violet-dim)' : 'var(--color-border-subtle)',
+                                                    color: qq.answered ? 'var(--color-accent-green)' : i === currentQIndex ? 'var(--color-accent-violet)' : 'var(--color-text-muted)',
+                                                }}>{qq.answered ? '✓' : i + 1}</span>
+                                                Q{i + 1}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Right column — question + answer */}
+                                <div>
+                                    {/* Question card */}
+                                    <div className="glass-card glass-card-accent" style={{ padding: '28px 30px', marginBottom: '16px' }}>
+                                        <div className="question-number-badge" style={{ marginBottom: '14px' }}>Question {currentQIndex + 1} of {totalQ}</div>
+                                        <div style={{ fontSize: '1.15rem', fontWeight: '600', lineHeight: '1.65', color: 'var(--color-text-primary)' }}>{q?.text || 'Loading question...'}</div>
+                                    </div>
+
+                                    {/* Answer textarea */}
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <label style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: '8px' }}>Your Answer</label>
+                                        <textarea
+                                            value={answerText}
+                                            onChange={(e) => setAnswerText(e.target.value)}
+                                            placeholder="Type your answer here, or click the 🎤 mic button to speak..."
+                                            disabled={feedbackReceived}
+                                            className="form-input"
+                                            style={{ minHeight: '130px', resize: 'vertical', lineHeight: '1.65', borderRadius: '12px', padding: '14px 16px', fontFamily: 'inherit' }}
+                                        />
+                                        <div style={{ textAlign: 'right', fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                                            {answerText.trim().split(/\s+/).filter(Boolean).length} words
+                                        </div>
+                                    </div>
+
+                                    {/* AI Feedback */}
+                                    {feedbackData && (
+                                        <div className="feedback-card glass-card" style={{ marginBottom: '16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--color-border-subtle)' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '0.68rem', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '4px' }}>AI Score</div>
+                                                    <div style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.04em', color: getScoreColor(feedbackData.score), lineHeight: '1' }}>{feedbackData.score}<span style={{ fontSize: '1rem', fontWeight: '400', color: 'var(--color-text-muted)' }}>/100</span></div>
+                                                </div>
+                                                <div style={{ flex: '1' }}>
+                                                    <div className="progress-bar-track">
+                                                        <div className="progress-bar-fill" style={{ width: `${feedbackData.score}%`, background: getScoreColor(feedbackData.score) }} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                                                <div style={{ padding: '10px 12px', background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: '8px' }}>
+                                                    <div style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--color-accent-green)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>✅ Strength</div>
+                                                    <div style={{ fontSize: '0.83rem', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>{feedbackData.positive}</div>
+                                                </div>
+                                                <div style={{ padding: '10px 12px', background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)', borderRadius: '8px' }}>
+                                                    <div style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--color-accent-amber)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>💡 Improve</div>
+                                                    <div style={{ fontSize: '0.83rem', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>{feedbackData.improve}</div>
+                                                </div>
+                                            </div>
+                                            <div style={{ padding: '10px 14px', background: 'rgba(139,92,246,0.07)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--color-text-secondary)', fontStyle: 'italic', lineHeight: '1.5' }}>
+                                                &ldquo;{feedbackData.brief}&rdquo;
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Action buttons */}
+                                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                        {!feedbackReceived && (
+                                            <>
+                                                <button className="btn btn-ghost" onClick={skipQuestion}>Skip →</button>
+                                                <button className="btn btn-primary" onClick={submitAnswer}>Submit Answer →</button>
+                                            </>
+                                        )}
+                                        {feedbackReceived && !isLast && (
+                                            <button className="btn btn-primary" onClick={nextQuestion}>Next Question →</button>
+                                        )}
+                                        {feedbackReceived && isLast && (
+                                            <button className="btn btn-primary" style={{ background: 'linear-gradient(135deg,#34d399,#22d3ee)' }} onClick={finishInterview}>
+                                                🏁 Finish & Get Report
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Proctoring Warning Modal */}
+                        {/* Warning Modal */}
                         {showWarningModal && (
                             <div className="proctor-modal-overlay">
                                 <div className="proctor-warning-card">
-                                    <div className="text-[3.5rem] mb-3" style={{ animation: 'warningPulse 1.5s ease-in-out infinite' }}>⚠️</div>
-                                    <h2 className="text-[1.6rem] font-extrabold text-accent-amber mb-[10px]">Warning!</h2>
-                                    <p className="text-text-primary text-base mb-4 leading-[1.5]">{warningReason}</p>
-                                    <div className="inline-block bg-[rgba(245,158,11,0.15)] border border-[rgba(245,158,11,0.3)] text-accent-amber font-bold text-[0.85rem] py-[6px] px-4 rounded-[20px] mb-[14px]">Warning {proctorWarnings} of {MAX_PROCTOR_WARNINGS}</div>
-                                    <p className="text-text-muted text-[0.82rem] mb-5 leading-[1.5]">Further violations will result in automatic termination.</p>
+                                    <div style={{ fontSize: '3rem', marginBottom: '12px', animation: 'warningPulse 1.5s ease-in-out infinite' }}>⚠️</div>
+                                    <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--color-accent-amber)', marginBottom: '8px' }}>Proctoring Warning</h2>
+                                    <p style={{ color: 'var(--color-text-secondary)', lineHeight: '1.6', marginBottom: '14px' }}>{warningReason}</p>
+                                    <div style={{ display: 'inline-block', background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)', color: 'var(--color-accent-amber)', fontWeight: '700', fontSize: '0.82rem', padding: '5px 14px', borderRadius: '20px', marginBottom: '16px' }}>
+                                        Warning {proctorWarnings} of {MAX_PROCTOR_WARNINGS}
+                                    </div>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '20px' }}>Further violations will result in automatic termination of the interview.</p>
                                     <button className="btn btn-primary" onClick={() => setShowWarningModal(false)}>I Understand — Continue</button>
                                 </div>
                             </div>
                         )}
 
-                        {/* Proctoring Terminated Modal */}
+                        {/* Terminated Modal */}
                         {showTerminatedModal && (
                             <div className="proctor-modal-overlay">
                                 <div className="proctor-terminated-card">
-                                    <div className="text-[3.5rem] mb-3">🚫</div>
-                                    <h2 className="text-[1.6rem] font-extrabold text-accent-rose mb-[10px]">Interview Terminated</h2>
-                                    <p className="text-text-secondary text-[0.95rem] mb-3 leading-[1.5]">Your interview has been automatically ended due to multiple proctoring violations.</p>
-                                    <p className="text-text-muted !text-[0.82rem] italic mb-5">Last violation: {terminatedReason}</p>
+                                    <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🚫</div>
+                                    <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--color-accent-rose)', marginBottom: '8px' }}>Interview Terminated</h2>
+                                    <p style={{ color: 'var(--color-text-secondary)', lineHeight: '1.6', marginBottom: '8px' }}>Your session was ended automatically due to repeated proctoring violations.</p>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontStyle: 'italic', marginBottom: '24px' }}>Reason: {terminatedReason}</p>
                                     <button className="btn btn-primary" onClick={dismissTerminated}>Return to Dashboard</button>
                                 </div>
                             </div>
@@ -1207,8 +1356,8 @@ export default function VoiceHireApp() {
             })()}
 
             {/* ═══════════════════════════════════════════
-           SCREEN 5: REPORT
-           ═══════════════════════════════════════════ */}
+               SCREEN 5: REPORT
+               ═══════════════════════════════════════════ */}
             {screen === 'report' && reportData && (() => {
                 const report = reportData.report;
                 const interview = reportData.interview;
@@ -1216,11 +1365,11 @@ export default function VoiceHireApp() {
                 const overallScore = report.overallScore || report.overall_score;
                 const grade = report.grade;
                 const skills = [
-                    { name: 'Communication', score: report.communication },
-                    { name: 'Relevance', score: report.relevance },
-                    { name: 'Confidence', score: report.confidence },
-                    { name: 'Structure', score: report.structure },
-                    { name: 'Depth', score: report.depth },
+                    { name: 'Communication', score: report.communication, icon: '💬' },
+                    { name: 'Relevance', score: report.relevance, icon: '🎯' },
+                    { name: 'Confidence', score: report.confidence, icon: '💪' },
+                    { name: 'Structure', score: report.structure, icon: '🏗️' },
+                    { name: 'Depth', score: report.depth, icon: '🔬' },
                 ];
                 const strengths = Array.isArray(report.strengths) ? report.strengths : JSON.parse(report.strengths || '[]');
                 const improvements = Array.isArray(report.improvements) ? report.improvements : JSON.parse(report.improvements || '[]');
@@ -1229,174 +1378,212 @@ export default function VoiceHireApp() {
                 return (
                     <div className="screen-container">
                         <div className="screen-report">
-                            <div className="text-center mb-8">
-                                <h2 className="text-[1.6rem] font-bold mb-1">Performance <span className="gradient-text">Report</span></h2>
-                                <div className="text-text-muted text-[0.85rem]">
-                                    {interview.jobRole || interview.job_role} · {interview.difficulty || ''} · {interview.interviewType || interview.interview_type || ''}
+                            {/* Hero score banner */}
+                            <div className="glass-card glass-card-elevated" style={{
+                                padding: '40px', marginBottom: '24px',
+                                background: 'linear-gradient(135deg,rgba(139,92,246,0.08),rgba(34,211,238,0.04))',
+                                border: '1px solid rgba(139,92,246,0.2)',
+                                display: 'flex', alignItems: 'center', gap: '36px', flexWrap: 'wrap',
+                            }}>
+                                <div style={{ textAlign: 'center', minWidth: '120px' }}>
+                                    <div style={{
+                                        width: '100px', height: '100px', borderRadius: '50%', margin: '0 auto 12px',
+                                        background: `conic-gradient(${getScoreColor(overallScore)} ${overallScore * 3.6}deg, rgba(255,255,255,0.05) 0deg)`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        boxShadow: `0 0 40px ${getScoreColor(overallScore)}33`,
+                                        position: 'relative',
+                                    }}>
+                                        <div style={{
+                                            width: '80px', height: '80px', borderRadius: '50%',
+                                            background: 'var(--color-bg-secondary)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        }}>
+                                            <span style={{ fontSize: '1.6rem', fontWeight: '800', color: getScoreColor(overallScore), letterSpacing: '-0.04em' }}>{overallScore}</span>
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: '1.1rem', fontWeight: '700', color: getScoreColor(overallScore) }}>{grade}</div>
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>Overall Score</div>
+                                </div>
+                                <div style={{ flex: '1', minWidth: '200px' }}>
+                                    <div style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '6px' }}>Performance Report</div>
+                                    <h2 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '6px', letterSpacing: '-0.3px' }}>
+                                        {interview.jobRole || interview.job_role}
+                                    </h2>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span className={`badge badge-${(interview.difficulty || '').toLowerCase()}`}>{interview.difficulty}</span>
+                                        <span className="badge badge-in-progress" style={{ textTransform: 'capitalize' }}>{interview.interviewType || interview.interview_type}</span>
+                                    </div>
+                                    <div style={{ marginTop: '16px', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                                        {qas.length} questions answered · {new Date(interview.started_at || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="glass-card text-center !p-10 mb-6">
-                                <div className="text-[4rem] font-extrabold leading-none" style={{ color: getScoreColor(overallScore) }}>{overallScore}</div>
-                                <div className="text-[1.1rem] mt-2 font-semibold" style={{ color: getScoreColor(overallScore) }}>{grade}</div>
-                            </div>
-
-                            <div className="glass-card !p-6 mb-6">
-                                <div className="text-[1.15rem] font-bold flex items-center gap-2 mb-4">📊 Skill Breakdown</div>
-                                <div className="mb-6">
+                            {/* Skill breakdown */}
+                            <div className="glass-card" style={{ padding: '28px', marginBottom: '20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                                    <div style={{ fontSize: '1.1rem' }}>📊</div>
+                                    <div style={{ fontWeight: '700', fontSize: '1rem' }}>Skill Breakdown</div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     {skills.map((s, i) => (
-                                        <div key={i} className="mb-[14px]">
-                                            <div className="flex justify-between text-[0.85rem] mb-[6px]">
-                                                <span className="font-semibold">{s.name}</span>
-                                                <span className="text-text-muted">{s.score}/100</span>
+                                        <div key={i}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600', fontSize: '0.875rem' }}>
+                                                    <span>{s.icon}</span>{s.name}
+                                                </span>
+                                                <span style={{ fontSize: '0.8rem', fontWeight: '700', color: getScoreColor(s.score) }}>{s.score}/100</span>
                                             </div>
                                             <div className="skill-bar-track">
-                                                <div className="skill-bar-fill" style={{ width: `${s.score}%`, background: getScoreColor(s.score) }} />
+                                                <div className="skill-bar-fill" style={{ width: `${s.score}%`, background: `linear-gradient(90deg,${getScoreColor(s.score)}99,${getScoreColor(s.score)})` }} />
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 mb-6 max-md:grid-cols-1">
-                                <div className="glass-card !p-5">
-                                    <h4 className="text-[0.85rem] uppercase tracking-[0.5px] mb-3 flex items-center gap-[6px] text-accent-green font-semibold">💪 Strengths</h4>
-                                    <ul className="list-none p-0">
+                            {/* Strengths / Improvements */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }} className="max-md:grid-cols-1">
+                                <div className="glass-card" style={{ padding: '24px', borderTop: '2px solid rgba(52,211,153,0.3)' }}>
+                                    <div style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-accent-green)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        💪 Strengths
+                                    </div>
+                                    <ul style={{ listStyle: 'none', padding: '0', margin: '0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {strengths.map((s, i) => (
-                                            <li key={i} className="py-2 border-b border-border-default text-text-secondary text-[0.9rem] flex items-start gap-2 last:border-b-0">
-                                                <span className="w-[6px] h-[6px] rounded-full bg-accent-green mt-2 shrink-0" />{s}
+                                            <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.875rem', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+                                                <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--color-accent-green-dim)', border: '1px solid rgba(52,211,153,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'var(--color-accent-green)', flexShrink: '0', marginTop: '1px', fontWeight: '700' }}>✓</span>
+                                                {s}
                                             </li>
                                         ))}
                                     </ul>
                                 </div>
-                                <div className="glass-card !p-5">
-                                    <h4 className="text-[0.85rem] uppercase tracking-[0.5px] mb-3 flex items-center gap-[6px] text-accent-amber font-semibold">🔧 Areas to Improve</h4>
-                                    <ul className="list-none p-0">
+                                <div className="glass-card" style={{ padding: '24px', borderTop: '2px solid rgba(251,191,36,0.3)' }}>
+                                    <div style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-accent-amber)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        🔧 Areas to Improve
+                                    </div>
+                                    <ul style={{ listStyle: 'none', padding: '0', margin: '0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {improvements.map((s, i) => (
-                                            <li key={i} className="py-2 border-b border-border-default text-text-secondary text-[0.9rem] flex items-start gap-2 last:border-b-0">
-                                                <span className="w-[6px] h-[6px] rounded-full bg-accent-amber mt-2 shrink-0" />{s}
+                                            <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.875rem', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+                                                <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--color-accent-amber-dim)', border: '1px solid rgba(251,191,36,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: 'var(--color-accent-amber)', flexShrink: '0', marginTop: '1px' }}>→</span>
+                                                {s}
                                             </li>
                                         ))}
                                     </ul>
                                 </div>
                             </div>
 
+                            {/* Recommendation */}
                             {recommendation && (
-                                <div className="glass-card recommendation-card !p-6 mb-6">
-                                    <h4 className="text-[0.85rem] text-accent-cyan uppercase tracking-[0.5px] mb-2 font-semibold">🎯 Recommendation</h4>
-                                    <p className="text-text-secondary text-[0.95rem] leading-[1.6]">{recommendation}</p>
+                                <div className="glass-card recommendation-card" style={{ padding: '24px', marginBottom: '20px' }}>
+                                    <div style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-accent-cyan)', marginBottom: '10px' }}>🎯 AI Recommendation</div>
+                                    <p style={{ color: 'var(--color-text-secondary)', lineHeight: '1.7', fontSize: '0.9rem' }}>{recommendation}</p>
                                 </div>
                             )}
 
-                            <div className="text-[1.15rem] font-bold flex items-center gap-2 mb-4">📝 Question & Answer Breakdown</div>
-                            <div className="mb-6">
-                                {qas.map((qa, i) => (
-                                    <div key={i} className="glass-card !p-5 mb-3">
-                                        <div className="font-semibold mb-2 text-[0.95rem]">Q{i + 1}: {qa.question_text}</div>
-                                        {qa.answer_text ? (
-                                            <>
-                                                <div className="text-text-secondary text-[0.9rem] mb-2 pl-3 border-l-2 border-border-default">{qa.answer_text}</div>
-                                                <div className="flex gap-4 text-[0.8rem] text-text-muted">
-                                                    <span className="font-bold" style={{ color: getScoreColor(qa.score) }}>Score: {qa.score}/100</span>
-                                                    {qa.positive && <span>✅ {qa.positive}</span>}
+                            {/* Q&A Breakdown */}
+                            <div style={{ marginBottom: '20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                                    <span style={{ fontSize: '1.1rem' }}>📝</span>
+                                    <span style={{ fontWeight: '700', fontSize: '1rem' }}>Question & Answer Breakdown</span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {qas.map((qa, i) => (
+                                        <div key={i} className="glass-card" style={{ padding: '20px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '10px' }}>
+                                                <div style={{ fontWeight: '600', fontSize: '0.9rem', lineHeight: '1.5', flex: '1' }}>
+                                                    <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', fontWeight: '700', marginRight: '6px' }}>Q{i + 1}</span>
+                                                    {qa.question_text}
                                                 </div>
-                                            </>
-                                        ) : (
-                                            <div className="text-text-muted text-[0.9rem] italic pl-3 border-l-2 border-border-default">— Skipped —</div>
-                                        )}
-                                    </div>
-                                ))}
+                                                {qa.score && <div className={`score-circle ${getScoreClass(qa.score)}`} style={{ width: '40px', height: '40px', fontSize: '0.78rem' }}>{qa.score}</div>}
+                                            </div>
+                                            {qa.answer_text ? (
+                                                <div style={{ paddingLeft: '12px', borderLeft: '2px solid var(--color-border-default)' }}>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', lineHeight: '1.6', marginBottom: '8px' }}>{qa.answer_text}</div>
+                                                    {qa.positive && <div style={{ fontSize: '0.78rem', color: 'var(--color-accent-green)' }}>✅ {qa.positive}</div>}
+                                                </div>
+                                            ) : (
+                                                <div style={{ padding: '8px 12px', borderLeft: '2px solid var(--color-border-default)', fontSize: '0.85rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>— Skipped —</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
 
-                            {/* ─── Behavior Analysis Report ─── */}
+                            {/* Behavior Analysis */}
                             {behaviorAnalysis && (() => {
                                 const ba = behaviorAnalysis;
-                                const confidenceColor = ba.confidenceRating === 'High' ? '#10b981' : ba.confidenceRating === 'Medium' ? '#f59e0b' : '#f43f5e';
-                                const profColor = ba.professionalism >= 7 ? '#10b981' : ba.professionalism >= 5 ? '#f59e0b' : '#f43f5e';
-                                const speechColor = ba.fillerScore >= 7 ? '#10b981' : ba.fillerScore >= 4 ? '#f59e0b' : '#f43f5e';
+                                const cColor = ba.confidenceRating === 'High' ? 'var(--color-accent-green)' : ba.confidenceRating === 'Medium' ? 'var(--color-accent-amber)' : 'var(--color-accent-rose)';
+                                const pColor = ba.professionalism >= 7 ? 'var(--color-accent-green)' : ba.professionalism >= 5 ? 'var(--color-accent-amber)' : 'var(--color-accent-rose)';
+                                const sColor = ba.fillerScore >= 7 ? 'var(--color-accent-green)' : ba.fillerScore >= 4 ? 'var(--color-accent-amber)' : 'var(--color-accent-rose)';
                                 return (
-                                    <div className="glass-card !p-6 mb-6" style={{ border: '1px solid rgba(124,58,237,0.25)', background: 'rgba(124,58,237,0.04)' }}>
-                                        <div className="text-[1.15rem] font-bold flex items-center gap-2 mb-5">🧠 Interview Behavior Report</div>
-
-                                        {/* Score Row */}
-                                        <div className="grid grid-cols-3 gap-4 mb-6 max-md:grid-cols-1">
-                                            <div className="text-center glass-card !p-4 !rounded-xl">
-                                                <div className="text-[0.72rem] text-text-muted uppercase tracking-[1px] mb-2 font-semibold">Confidence Rating</div>
-                                                <div className="text-[1.6rem] font-extrabold" style={{ color: confidenceColor }}>{ba.confidenceRating}</div>
-                                            </div>
-                                            <div className="text-center glass-card !p-4 !rounded-xl">
-                                                <div className="text-[0.72rem] text-text-muted uppercase tracking-[1px] mb-2 font-semibold">Professionalism</div>
-                                                <div className="text-[1.6rem] font-extrabold" style={{ color: profColor }}>{ba.professionalism}<span className="text-[1rem] font-normal text-text-muted">/10</span></div>
-                                            </div>
-                                            <div className="text-center glass-card !p-4 !rounded-xl">
-                                                <div className="text-[0.72rem] text-text-muted uppercase tracking-[1px] mb-2 font-semibold">Speech Confidence</div>
-                                                <div className="text-[1.6rem] font-extrabold" style={{ color: speechColor }}>{ba.fillerScore}<span className="text-[1rem] font-normal text-text-muted">/10</span></div>
-                                            </div>
+                                    <div className="glass-card" style={{ padding: '28px', marginBottom: '20px', border: '1px solid rgba(139,92,246,0.2)', background: 'rgba(139,92,246,0.03)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+                                            <span style={{ fontSize: '1.1rem' }}>🧠</span>
+                                            <span style={{ fontWeight: '700', fontSize: '1rem' }}>Behavior Analysis</span>
                                         </div>
 
-                                        {/* Filler Word Analysis */}
-                                        <div className="mb-5">
-                                            <div className="text-[0.82rem] uppercase tracking-[0.5px] font-bold text-text-secondary mb-3 flex items-center gap-2">🗣️ Filler Word Analysis</div>
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <span className="text-[0.85rem] text-text-muted">Total Fillers Detected:</span>
-                                                <span className="font-bold text-[0.95rem]" style={{ color: speechColor }}>{ba.totalFillers}</span>
-                                                <span className="text-[0.75rem] px-2 py-[2px] rounded-full font-semibold" style={{ background: `${speechColor}22`, color: speechColor }}>{ba.fillerLabel}</span>
+                                        {/* 3 metric chips */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px', marginBottom: '24px' }}>
+                                            {[
+                                                { label: 'Confidence', value: ba.confidenceRating, color: cColor },
+                                                { label: 'Professionalism', value: `${ba.professionalism}/10`, color: pColor },
+                                                { label: 'Speech Clarity', value: `${ba.fillerScore}/10`, color: sColor },
+                                            ].map((m, i) => (
+                                                <div key={i} style={{ textAlign: 'center', padding: '16px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border-subtle)', borderRadius: '12px', borderTop: `2px solid ${m.color}44` }}>
+                                                    <div style={{ fontSize: '0.67rem', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '6px' }}>{m.label}</div>
+                                                    <div style={{ fontSize: '1.3rem', fontWeight: '800', color: m.color, letterSpacing: '-0.02em' }}>{m.value}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Filler words */}
+                                        <div style={{ marginBottom: '20px' }}>
+                                            <div style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '10px' }}>🗣️ Filler Word Analysis</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                                <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>Total detected: <strong style={{ color: sColor }}>{ba.totalFillers}</strong></span>
+                                                <span style={{ fontSize: '0.72rem', padding: '3px 10px', borderRadius: '20px', fontWeight: '700', background: `${sColor}15`, color: sColor, border: `1px solid ${sColor}30` }}>{ba.fillerLabel}</span>
                                             </div>
                                             {ba.topFillers.length > 0 ? (
-                                                <div className="flex flex-wrap gap-2">
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
                                                     {ba.topFillers.map(([word, count]) => (
-                                                        <span key={word} className="px-3 py-[5px] rounded-full text-[0.8rem] font-semibold" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                                                        <span key={word} style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', background: 'rgba(251,191,36,0.1)', color: 'var(--color-accent-amber)', border: '1px solid rgba(251,191,36,0.2)' }}>
                                                             &ldquo;{word}&rdquo; × {count}
                                                         </span>
                                                     ))}
                                                 </div>
                                             ) : (
-                                                <span className="text-[0.85rem] text-accent-green font-semibold">✅ No filler words detected — excellent speech clarity!</span>
+                                                <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--color-accent-green)', fontWeight: '500' }}>✅ No filler words — excellent speech clarity!</div>
                                             )}
                                         </div>
 
-                                        {/* Detected Nervous Behaviors */}
-                                        <div className="mb-5">
-                                            <div className="text-[0.82rem] uppercase tracking-[0.5px] font-bold text-text-secondary mb-3">😰 Detected Nervous Behaviors</div>
-                                            <ul className="list-none p-0 m-0">
-                                                {ba.nervousBehaviors.map((b, i) => (
-                                                    <li key={i} className="flex items-start gap-2 py-[7px] border-b border-border-default text-text-secondary text-[0.88rem] last:border-b-0">
-                                                        <span className="w-[6px] h-[6px] rounded-full bg-accent-rose mt-[6px] shrink-0" style={{ background: b.includes('✅') ? '#10b981' : '#f43f5e' }} />{b}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-
-                                        {/* Posture Observations */}
-                                        <div className="mb-5">
-                                            <div className="text-[0.82rem] uppercase tracking-[0.5px] font-bold text-text-secondary mb-3">🧍 Posture Observations</div>
-                                            <ul className="list-none p-0 m-0">
-                                                {ba.postureObs.map((obs, i) => (
-                                                    <li key={i} className="flex items-start gap-2 py-[7px] border-b border-border-default text-text-secondary text-[0.88rem] last:border-b-0">
-                                                        <span className="w-[6px] h-[6px] rounded-full bg-accent-cyan mt-[6px] shrink-0" />{obs}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-
-                                        {/* Improvement Suggestions */}
-                                        <div>
-                                            <div className="text-[0.82rem] uppercase tracking-[0.5px] font-bold text-text-secondary mb-3">💡 Improvement Suggestions</div>
-                                            <ul className="list-none p-0 m-0">
-                                                {ba.suggestions.map((s, i) => (
-                                                    <li key={i} className="flex items-start gap-2 py-[7px] border-b border-border-default text-text-secondary text-[0.88rem] last:border-b-0">
-                                                        <span className="w-[6px] h-[6px] rounded-full bg-accent-violet mt-[6px] shrink-0" />{s}
-                                                    </li>
-                                                ))}
-                                            </ul>
+                                        {/* Behaviors + Posture + Suggestions in a 3-col grid */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px' }} className="max-md:grid-cols-1">
+                                            {[
+                                                { title: '😰 Nervous Behaviors', items: ba.nervousBehaviors, dotColor: 'var(--color-accent-rose)' },
+                                                { title: '🧍 Posture Observations', items: ba.postureObs, dotColor: 'var(--color-accent-cyan)' },
+                                                { title: '💡 Improvement Tips', items: ba.suggestions, dotColor: 'var(--color-accent-violet)' },
+                                            ].map((col, i) => (
+                                                <div key={i} style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--color-border-subtle)' }}>
+                                                    <div style={{ fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: '10px' }}>{col.title}</div>
+                                                    <ul style={{ listStyle: 'none', padding: '0', margin: '0', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                                                        {col.items.map((item, j) => (
+                                                            <li key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+                                                                <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: item.includes('✅') ? 'var(--color-accent-green)' : col.dotColor, flexShrink: '0', marginTop: '6px' }} />
+                                                                {item}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 );
                             })()}
 
-                            <div className="flex gap-3 justify-center mt-6 pb-10">
+                            {/* Action buttons */}
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', paddingBottom: '32px' }}>
                                 <button className="btn btn-secondary" onClick={() => navigate('dashboard')}>← Back to Dashboard</button>
-                                <button className="btn btn-primary" onClick={() => navigate('setup')}>🎙️ New Interview</button>
+                                <button className="btn btn-primary" onClick={() => navigate('setup')}>🎙️ Start New Interview</button>
                             </div>
                         </div>
                     </div>
@@ -1404,4 +1591,4 @@ export default function VoiceHireApp() {
             })()}
         </div>
     );
-}
+}
