@@ -1086,8 +1086,50 @@ export default function VoiceHireApp() {
                         <form className="glass-card" style={{ padding: '36px' }} onSubmit={handleStartInterview}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 <div className="form-group">
-                                    <label className="form-label">Job Role <span style={{ color: 'var(--color-accent-rose)' }}>*</span></label>
-                                    <input type="text" name="setup-role" placeholder="e.g. Software Engineer, Product Manager, Data Analyst" required className="form-input" style={{ fontSize: '0.95rem' }} />
+                                    <label className="form-label">Job Role / Department <span style={{ color: 'var(--color-accent-rose)' }}>*</span></label>
+                                    <input list="job-roles" type="text" name="setup-role" placeholder="e.g. Software Engineer, VLSI Engineer, Structural Engineer..." required className="form-input" style={{ fontSize: '0.95rem' }} />
+                                    <datalist id="job-roles">
+                                        {/* CSE / IT */}
+                                        <option value="Software Engineer (CSE)" />
+                                        <option value="Frontend Developer (CSE)" />
+                                        <option value="Backend Developer (CSE)" />
+                                        <option value="Full Stack Developer (CSE)" />
+                                        <option value="Data Scientist (CSE)" />
+                                        <option value="AI/ML Engineer (CSE)" />
+                                        <option value="Cybersecurity Analyst (CSE)" />
+                                        <option value="Information Technology (IT)" />
+                                        {/* ECE */}
+                                        <option value="Embedded Systems Engineer (ECE)" />
+                                        <option value="VLSI Design Engineer (ECE)" />
+                                        <option value="Telecommunications Engineer (ECE)" />
+                                        <option value="Network Engineer (ECE)" />
+                                        <option value="Electronics and Communication (ECE)" />
+                                        {/* EEE */}
+                                        <option value="Power Systems Engineer (EEE)" />
+                                        <option value="Control Systems Engineer (EEE)" />
+                                        <option value="Electrical Design Engineer (EEE)" />
+                                        <option value="Renewable Energy Engineer (EEE)" />
+                                        <option value="Electrical and Electronics (EEE)" />
+                                        {/* Mechanical */}
+                                        <option value="Mechanical Design Engineer (Mech)" />
+                                        <option value="Thermal Engineer (Mech)" />
+                                        <option value="Manufacturing Engineer (Mech)" />
+                                        <option value="Automotive Engineer (Mech)" />
+                                        <option value="Robotics Engineer (Mech)" />
+                                        <option value="Mechanical Engineering" />
+                                        {/* Civil */}
+                                        <option value="Structural Engineer (Civil)" />
+                                        <option value="Construction Manager (Civil)" />
+                                        <option value="Geotechnical Engineer (Civil)" />
+                                        <option value="Transportation Engineer (Civil)" />
+                                        <option value="Environmental Engineer (Civil)" />
+                                        <option value="Civil Engineering" />
+                                        {/* General/Other */}
+                                        <option value="Product Manager" />
+                                        <option value="Business Analyst" />
+                                        <option value="Data Analyst" />
+                                        <option value="HR Manager" />
+                                    </datalist>
                                 </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }} className="max-sm:grid-cols-1">
