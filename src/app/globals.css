@@ -1204,6 +1204,54 @@ select.form-input option {
   }
 }
 
+/* Resume drop zone */
+.resume-drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  border: 2px dashed var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.25s;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.resume-drop-zone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-brand-soft);
+  opacity: 0;
+  transition: opacity 0.25s;
+  border-radius: inherit;
+}
+
+.resume-drop-zone:hover {
+  border-color: var(--color-accent-violet);
+  background: rgba(139, 92, 246, 0.04);
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.1);
+}
+
+.resume-drop-zone:hover::before {
+  opacity: 1;
+}
+
+.resume-drop-zone.drag-over {
+  border-color: var(--color-accent-cyan);
+  background: rgba(34, 211, 238, 0.05);
+  box-shadow: 0 0 32px rgba(34, 211, 238, 0.15);
+  transform: scale(1.01);
+}
+
+.resume-drop-zone.drag-over::before {
+  opacity: 1;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(139, 92, 246, 0.08));
+}
+
 @media (max-width: 480px) {
   .camera-panel {
     max-width: 200px;
@@ -1213,3 +1261,104 @@ select.form-input option {
     font-size: 1.6rem;
   }
 }
+
+
+/* ════════════ RESUME ANALYZER ════════════ */
+.screen-resume {
+  max-width: 960px;
+  margin: 16px auto 0;
+  width: 100%;
+}
+
+.resume-textarea {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  line-height: 1.65;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.resume-textarea:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-input-focus);
+}
+
+.resume-textarea:focus {
+  border-color: var(--color-accent-violet);
+  background: var(--color-bg-input-focus);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.resume-textarea::placeholder {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* Keyword pills */
+.keyword-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: transform 0.15s;
+}
+
+.keyword-pill:hover {
+  transform: translateY(-1px);
+}
+
+.keyword-found {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--color-accent-green);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.keyword-missing {
+  background: rgba(251, 113, 133, 0.1);
+  color: var(--color-accent-rose);
+  border: 1px solid rgba(251, 113, 133, 0.22);
+}
+
+/* Inline spinner for analyze button */
+.spinner-sm {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spinSm 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spinSm {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .screen-resume > .glass-card > div[style*="grid-template-columns: 1fr 300px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .screen-resume div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .screen-resume div[style*="grid-template-columns: repeat(3,1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .screen-resume div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}

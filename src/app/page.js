@@ -29,6 +29,16 @@ export default function VoiceHireApp() {
     // Report
     const [reportData, setReportData] = useState(null);
 
+    // Resume Analyzer
+    const [resumeText, setResumeText] = useState('');
+    const [resumeRole, setResumeRole] = useState('');
+    const [resumeResult, setResumeResult] = useState(null);
+    const [resumeLoading, setResumeLoading] = useState(false);
+    const [resumeInputTab, setResumeInputTab] = useState('paste'); // 'upload' | 'paste'
+    const [resumeUploading, setResumeUploading] = useState(false);
+    const [resumeFileName, setResumeFileName] = useState('');
+    const [resumeDragOver, setResumeDragOver] = useState(false);
+
     // Voice
     const [isRecording, setIsRecording] = useState(false);
     const [speakerEnabled, setSpeakerEnabled] = useState(true);
@@ -852,6 +862,9 @@ export default function VoiceHireApp() {
                         <button onClick={() => navigate('setup')} className={`nav-btn ${screen === 'setup' ? 'active' : ''}`}>
                             🎙️ New Interview
                         </button>
+                        <button onClick={() => { setResumeResult(null); setResumeText(''); setResumeRole(''); navigate('resume'); }} className={`nav-btn ${screen === 'resume' ? 'active' : ''}`}>
+                            📄 Resume Analyzer
+                        </button>
                     </div>
                     <div className="navbar-user">
                         <div className="user-avatar">{(user?.name || 'U').charAt(0).toUpperCase()}</div>
@@ -1627,6 +1640,318 @@ export default function VoiceHireApp() {
                                 <button className="btn btn-secondary" onClick={() => navigate('dashboard')}>← Back to Dashboard</button>
                                 <button className="btn btn-primary" onClick={() => navigate('setup')}>🎙️ Start New Interview</button>
                             </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ═══════════════════════════════════════════
+               SCREEN 6: RESUME ANALYZER
+               ═══════════════════════════════════════════ */}
+            {screen === 'resume' && (() => {
+                const handleAnalyzeResume = async () => {
+                    if (!resumeText || resumeText.trim().length < 50) {
+                        if (resumeInputTab === 'upload') {
+                            toast('Please upload your resume file first (PDF or TXT).', 'error');
+                        } else {
+                            toast('Please paste your resume text (at least 50 characters).', 'error');
+                        }
+                        return;
+                    }
+                    if (!resumeRole || resumeRole.trim().length < 2) {
+                        toast('Please enter a target job role.', 'error');
+                        return;
+                    }
+                    setResumeLoading(true);
+                    setResumeResult(null);
+                    try {
+                        const res = await api('/resume/analyze', {
+                            method: 'POST',
+                            body: { resumeText, jobRole: resumeRole },
+                        });
+                        if (res.success && res.analysis) {
+                            setResumeResult(res.analysis);
+                            toast('Resume analyzed successfully! 🎯', 'success');
+                        } else {
+                            toast(res.message || 'Analysis failed. Please try again.', 'error');
+                        }
+                    } catch (err) {
+                        toast(err.message || 'Failed to analyze resume.', 'error');
+                    } finally {
+                        setResumeLoading(false);
+                    }
+                };
+
+                const scoreColor = (s) => s >= 80 ? '#10b981' : s >= 60 ? '#06b6d4' : s >= 40 ? '#f59e0b' : '#f43f5e';
+                const scoreLabel = (s) => s >= 80 ? 'Excellent' : s >= 60 ? 'Good' : s >= 40 ? 'Fair' : 'Needs Work';
+
+                return (
+                    <div className="screen-container">
+                        <div className="screen-resume">
+                            {/* Header */}
+                            <div style={{ textAlign: 'center', marginBottom: '32px', padding: '8px 0' }}>
+                                <div style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-accent-violet)', marginBottom: '8px' }}>AI-Powered</div>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: '800', letterSpacing: '-0.3px', marginBottom: '8px' }}>
+                                    <span className="gradient-text">Resume</span> Analyzer
+                                </h2>
+                                <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Get instant ATS feedback, keyword analysis, and actionable improvements for your target role.</p>
+                            </div>
+
+                            {/* Input Panel */}
+                            <div className="glass-card" style={{ padding: '32px', marginBottom: '28px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px', alignItems: 'flex-start' }}>
+                                    {/* Left: tab switcher + input */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {/* Tab bar */}
+                                        <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '4px', border: '1px solid var(--color-border-subtle)', width: 'fit-content' }}>
+                                            {[{ id: 'upload', label: '📎 Upload File' }, { id: 'paste', label: '📋 Paste Text' }].map((tab) => (
+                                                <button
+                                                    key={tab.id}
+                                                    onClick={() => setResumeInputTab(tab.id)}
+                                                    style={{
+                                                        padding: '6px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                                                        fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: '600',
+                                                        transition: 'all 0.2s',
+                                                        background: resumeInputTab === tab.id ? 'var(--gradient-brand)' : 'transparent',
+                                                        color: resumeInputTab === tab.id ? '#fff' : 'var(--color-text-muted)',
+                                                        boxShadow: resumeInputTab === tab.id ? '0 2px 8px rgba(139,92,246,0.3)' : 'none',
+                                                    }}
+                                                >
+                                                    {tab.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Upload Tab */}
+                                        {resumeInputTab === 'upload' && (() => {
+                                            const handleFile = async (file) => {
+                                                if (!file) return;
+                                                const ext = file.name.split('.').pop().toLowerCase();
+                                                if (!['pdf', 'txt'].includes(ext)) {
+                                                    toast('Only PDF and TXT files are supported.', 'error');
+                                                    return;
+                                                }
+                                                setResumeUploading(true);
+                                                setResumeFileName(file.name);
+                                                try {
+                                                    const fd = new FormData();
+                                                    fd.append('resume', file);
+                                                    const res = await fetch('/api/resume/upload', {
+                                                        method: 'POST',
+                                                        headers: { Authorization: `Bearer ${token}` },
+                                                        body: fd,
+                                                    });
+                                                    const data = await res.json();
+                                                    if (data.success && data.text) {
+                                                        setResumeText(data.text);
+                                                        setResumeInputTab('paste');
+                                                        toast(`✅ ${file.name} loaded — ${data.text.length} characters extracted!`, 'success');
+                                                    } else {
+                                                        toast(data.message || 'Failed to extract text from file.', 'error');
+                                                    }
+                                                } catch {
+                                                    toast('Upload failed. Please paste your resume instead.', 'error');
+                                                } finally {
+                                                    setResumeUploading(false);
+                                                }
+                                            };
+                                            return (
+                                                <div
+                                                    className={`resume-drop-zone ${resumeDragOver ? 'drag-over' : ''}`}
+                                                    onDragOver={(e) => { e.preventDefault(); setResumeDragOver(true); }}
+                                                    onDragLeave={() => setResumeDragOver(false)}
+                                                    onDrop={(e) => { e.preventDefault(); setResumeDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+                                                    onClick={() => { if (!resumeUploading) document.getElementById('resume-file-input').click(); }}
+                                                    style={{ cursor: resumeUploading ? 'default' : 'pointer' }}
+                                                >
+                                                    <input
+                                                        id="resume-file-input"
+                                                        type="file"
+                                                        accept=".pdf,.txt"
+                                                        style={{ display: 'none' }}
+                                                        onChange={(e) => handleFile(e.target.files[0])}
+                                                    />
+                                                    {resumeUploading ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                                            <span className="spinner-sm" style={{ width: '28px', height: '28px', borderWidth: '3px' }} />
+                                                            <div style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)' }}>Extracting text from <strong>{resumeFileName}</strong>...</div>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{ fontSize: '2.8rem', lineHeight: '1' }}>📄</div>
+                                                            <div style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>
+                                                                {resumeDragOver ? 'Drop it here!' : 'Drag & drop your resume'}
+                                                            </div>
+                                                            <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>or click to browse</div>
+                                                            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                                                {['PDF', 'TXT'].map((f) => (
+                                                                    <span key={f} style={{ padding: '3px 10px', borderRadius: '6px', background: 'rgba(139,92,246,0.1)', color: 'var(--color-accent-violet)', fontSize: '0.72rem', fontWeight: '700', border: '1px solid rgba(139,92,246,0.2)' }}>{f}</span>
+                                                                ))}
+                                                            </div>
+                                                            {resumeFileName && !resumeUploading && (
+                                                                <div style={{ fontSize: '0.78rem', color: 'var(--color-accent-green)', marginTop: '4px' }}>✓ Previously loaded: {resumeFileName}</div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* Paste Tab */}
+                                        {resumeInputTab === 'paste' && (
+                                            <div className="form-group" style={{ margin: 0 }}>
+                                                <textarea
+                                                    value={resumeText}
+                                                    onChange={(e) => setResumeText(e.target.value)}
+                                                    placeholder="Paste your full resume here — include your summary, experience, education, and skills sections..."
+                                                    className="form-input resume-textarea"
+                                                    rows={12}
+                                                    style={{ resize: 'vertical', minHeight: '220px', fontFamily: 'inherit', lineHeight: '1.6' }}
+                                                />
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>{resumeText.length} characters</div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Right: role + button + features */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                        <div className="form-group" style={{ margin: 0 }}>
+                                            <label className="form-label">Target Job Role <span style={{ color: 'var(--color-accent-rose)' }}>*</span></label>
+                                            <input
+                                                type="text"
+                                                value={resumeRole}
+                                                onChange={(e) => setResumeRole(e.target.value)}
+                                                placeholder="e.g. Software Engineer, Data Scientist"
+                                                className="form-input"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={handleAnalyzeResume}
+                                            disabled={resumeLoading || resumeUploading}
+                                            className="btn btn-primary btn-lg"
+                                            style={{ width: '100%', marginTop: '4px', gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        >
+                                            {resumeLoading ? (
+                                                <><span className="spinner-sm" />  Analyzing...</>
+                                            ) : (
+                                                <>🔍 Analyze Resume</>
+                                            )}
+                                        </button>
+                                        <div style={{ padding: '14px', background: 'rgba(139,92,246,0.06)', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.15)' }}>
+                                            <div style={{ fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-accent-violet)', marginBottom: '8px' }}>What you'll get</div>
+                                            {['ATS Compatibility Score', 'Strengths & Skill Gaps', 'Keyword Analysis', 'Formatting & Content Scores', 'Actionable Improvement Tips'].map((item, i) => (
+                                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
+                                                    <span style={{ color: 'var(--color-accent-green)', fontSize: '0.75rem' }}>✓</span> {item}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Results */}
+                            {resumeResult && (() => {
+                                const r = resumeResult;
+                                return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '40px' }}>
+                                        {/* Score Row */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                                            {/* ATS Score */}
+                                            <div className="glass-card" style={{ padding: '28px', textAlign: 'center', borderTop: `3px solid ${scoreColor(r.atsScore)}` }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-muted)', marginBottom: '12px' }}>ATS Score</div>
+                                                <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
+                                                    <svg width="100" height="100" viewBox="0 0 100 100">
+                                                        <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+                                                        <circle cx="50" cy="50" r="42" fill="none" stroke={scoreColor(r.atsScore)} strokeWidth="10"
+                                                            strokeDasharray={`${(r.atsScore / 100) * 264} 264`}
+                                                            strokeLinecap="round"
+                                                            transform="rotate(-90 50 50)"
+                                                            style={{ transition: 'stroke-dasharray 1s ease' }}
+                                                        />
+                                                        <text x="50" y="50" dominantBaseline="central" textAnchor="middle" fill={scoreColor(r.atsScore)} fontSize="20" fontWeight="800">{r.atsScore}</text>
+                                                        <text x="50" y="65" dominantBaseline="central" textAnchor="middle" fill="#9ca3af" fontSize="8">/ 100</text>
+                                                    </svg>
+                                                </div>
+                                                <div style={{ fontSize: '1rem', fontWeight: '700', color: scoreColor(r.atsScore) }}>{scoreLabel(r.atsScore)}</div>
+                                            </div>
+                                            {/* Content + Formatting */}
+                                            <div className="glass-card" style={{ padding: '28px', textAlign: 'center' }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-muted)', marginBottom: '12px' }}>Content Score</div>
+                                                <div style={{ fontSize: '3rem', fontWeight: '900', color: scoreColor(r.contentScore * 10), lineHeight: '1', marginBottom: '6px' }}>{r.contentScore}<span style={{ fontSize: '1.2rem', opacity: '0.5' }}>/10</span></div>
+                                                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '12px' }}>Relevance & depth of your content</div>
+                                            </div>
+                                            <div className="glass-card" style={{ padding: '28px', textAlign: 'center' }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-muted)', marginBottom: '12px' }}>Formatting Score</div>
+                                                <div style={{ fontSize: '3rem', fontWeight: '900', color: scoreColor(r.formattingScore * 10), lineHeight: '1', marginBottom: '6px' }}>{r.formattingScore}<span style={{ fontSize: '1.2rem', opacity: '0.5' }}>/10</span></div>
+                                                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '12px' }}>Structure, clarity & readability</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Summary + Experience */}
+                                        <div className="glass-card" style={{ padding: '24px', display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-muted)', marginBottom: '8px' }}>📝 Overall Summary</div>
+                                                <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', lineHeight: '1.7', margin: 0 }}>{r.summary}</p>
+                                            </div>
+                                            <div style={{ flexShrink: 0, padding: '12px 20px', borderRadius: '12px', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', textAlign: 'center', minWidth: '120px' }}>
+                                                <div style={{ fontSize: '0.65rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: '6px' }}>Level</div>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--color-accent-violet)' }}>{r.experienceLevel || 'Mid Level'}</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Keywords */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                            <div className="glass-card" style={{ padding: '22px' }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-accent-green)', marginBottom: '12px' }}>✅ Keywords Found</div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                    {(r.keywordsFound || []).map((kw, i) => (
+                                                        <span key={i} className="keyword-pill keyword-found">{kw}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="glass-card" style={{ padding: '22px' }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-accent-rose)', marginBottom: '12px' }}>❌ Keywords Missing</div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                    {(r.keywordsMissing || []).map((kw, i) => (
+                                                        <span key={i} className="keyword-pill keyword-missing">{kw}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Strengths / Gaps / Suggestions */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px' }}>
+                                            {[
+                                                { title: '💪 Strengths', items: r.strengths || [], dotColor: 'var(--color-accent-green)' },
+                                                { title: '⚠️ Gaps', items: r.gaps || [], dotColor: 'var(--color-accent-amber)' },
+                                                { title: '💡 Suggestions', items: r.suggestions || [], dotColor: 'var(--color-accent-violet)' },
+                                            ].map((col, i) => (
+                                                <div key={i} className="glass-card" style={{ padding: '22px' }}>
+                                                    <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', color: col.dotColor, marginBottom: '12px' }}>{col.title}</div>
+                                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        {col.items.map((item, j) => (
+                                                            <li key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+                                                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: col.dotColor, flexShrink: 0, marginTop: '6px' }} />
+                                                                {item}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                                            <button className="btn btn-secondary" onClick={() => { setResumeResult(null); setResumeText(''); setResumeRole(''); }}>
+                                                🔄 Analyze Another Resume
+                                            </button>
+                                            <button className="btn btn-primary" onClick={() => navigate('setup')}>
+                                                🎙️ Practice Interview for This Role
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 );
